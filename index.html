@@ -1,18 +1,23 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SIGOBS — Système d'Information de Gestion des OBStacles</title>
+  <meta name="description"
+    content="SIGOBS — Système de Gestion des Obstacles aéronautiques. Analyse OLS ICAO Annexe 14. Surfaces générées par le backend." />
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap"
+    rel="stylesheet" />
 
-  <!-- Mapbox GL JS -->
-  <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet" />
-  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+  <!-- MapLibre GL JS (open-source, sans token) -->
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 
   <!-- jsPDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -20,164 +25,427 @@
   <!-- SIGOBS styles -->
   <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
 
-<!-- ════════════════════════════════════════
+  <!-- ════════════════════════════════════════
      LOGIN SCREEN
 ════════════════════════════════════════ -->
-<div id="screen-login" class="screen active">
-  <div class="login-bg">
-    <div class="login-grid"></div>
-    <div class="login-sweep"></div>
-  </div>
-  <div class="login-card">
-    <div class="login-logo">
-      <div class="logo-icon">
-        <svg viewBox="0 0 48 48" fill="none">
-          <circle cx="24" cy="24" r="22" stroke="var(--cyan)" stroke-width="1.5" stroke-dasharray="4 2"/>
-          <circle cx="24" cy="24" r="14" stroke="var(--cyan)" stroke-width="1" opacity="0.5"/>
-          <circle cx="24" cy="24" r="3" fill="var(--cyan)"/>
-          <line x1="24" y1="2" x2="24" y2="10" stroke="var(--cyan)" stroke-width="1.5"/>
-          <line x1="24" y1="38" x2="24" y2="46" stroke="var(--cyan)" stroke-width="1.5"/>
-          <line x1="2" y1="24" x2="10" y2="24" stroke="var(--cyan)" stroke-width="1.5"/>
-          <line x1="38" y1="24" x2="46" y2="24" stroke="var(--cyan)" stroke-width="1.5"/>
-          <polyline points="24,10 28,18 24,14 20,18 24,10" fill="var(--cyan)" opacity="0.8"/>
-        </svg>
-      </div>
-      <div class="logo-text">
-        <span class="logo-main">SIGOBS</span>
-        <span class="logo-sub">Système de Gestion des Obstacles</span>
-      </div>
+  <div id="screen-login" class="screen active">
+    <div class="login-bg">
+      <div class="login-grid"></div>
+      <div class="login-sweep"></div>
     </div>
-    <div class="login-divider">
-      <span class="divider-label">AUTHENTIFICATION REQUISE</span>
-    </div>
-    <div class="login-form">
-      <div class="field-group">
-        <label class="field-label">IDENTIFIANT</label>
-        <div class="field-wrap">
-          <svg class="field-icon" viewBox="0 0 20 20" fill="none">
-            <circle cx="10" cy="7" r="4" stroke="currentColor" stroke-width="1.5"/>
-            <path d="M2 18c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 48 48" fill="none">
+            <circle cx="24" cy="24" r="22" stroke="var(--cyan)" stroke-width="1.5" stroke-dasharray="4 2" />
+            <circle cx="24" cy="24" r="14" stroke="var(--cyan)" stroke-width="1" opacity="0.5" />
+            <circle cx="24" cy="24" r="3" fill="var(--cyan)" />
+            <line x1="24" y1="2" x2="24" y2="10" stroke="var(--cyan)" stroke-width="1.5" />
+            <line x1="24" y1="38" x2="24" y2="46" stroke="var(--cyan)" stroke-width="1.5" />
+            <line x1="2" y1="24" x2="10" y2="24" stroke="var(--cyan)" stroke-width="1.5" />
+            <line x1="38" y1="24" x2="46" y2="24" stroke="var(--cyan)" stroke-width="1.5" />
+            <polyline points="24,10 28,18 24,14 20,18 24,10" fill="var(--cyan)" opacity="0.8" />
           </svg>
-          <input id="login-username" type="text" class="field-input" placeholder="nom.utilisateur" autocomplete="username"/>
+        </div>
+        <div class="logo-text">
+          <span class="logo-main">SIGOBS</span>
+          <span class="logo-sub">Système de Gestion des Obstacles</span>
         </div>
       </div>
-      <div class="field-group">
-        <label class="field-label">MOT DE PASSE</label>
-        <div class="field-wrap">
-          <svg class="field-icon" viewBox="0 0 20 20" fill="none">
-            <rect x="4" y="9" width="12" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/>
-            <path d="M7 9V6a3 3 0 016 0v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            <circle cx="10" cy="13.5" r="1.5" fill="currentColor"/>
-          </svg>
-          <input id="login-password" type="password" class="field-input" placeholder="••••••••" autocomplete="current-password"/>
-        </div>
+      <div class="login-divider">
+        <span class="divider-label">AUTHENTIFICATION REQUISE</span>
       </div>
-      <div id="login-error" class="login-error hidden"></div>
-      <button id="btn-login" class="btn-primary btn-full" onclick="handleLogin()">
-        <span class="btn-label">CONNEXION</span>
-        <span class="btn-loader hidden"><span class="spinner"></span></span>
-      </button>
-    </div>
-    <div class="login-footer">
-      <span class="footer-badge">OACI ANNEXE 14</span>
-      <span class="footer-badge">PANS-OLS</span>
-      <span class="footer-badge">Edited by A2G</span>
+      <div class="login-form">
+        <div class="field-group">
+          <label class="field-label">IDENTIFIANT</label>
+          <div class="field-wrap">
+            <svg class="field-icon" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="7" r="4" stroke="currentColor" stroke-width="1.5" />
+              <path d="M2 18c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+            <input id="login-username" type="text" class="field-input" placeholder="nom.utilisateur"
+              autocomplete="username" />
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">MOT DE PASSE</label>
+          <div class="field-wrap">
+            <svg class="field-icon" viewBox="0 0 20 20" fill="none">
+              <rect x="4" y="9" width="12" height="9" rx="2" stroke="currentColor" stroke-width="1.5" />
+              <path d="M7 9V6a3 3 0 016 0v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              <circle cx="10" cy="13.5" r="1.5" fill="currentColor" />
+            </svg>
+            <input id="login-password" type="password" class="field-input" placeholder="••••••••"
+              autocomplete="current-password" />
+          </div>
+        </div>
+        <div id="login-error" class="login-error hidden"></div>
+        <button id="btn-login" class="btn-primary btn-full" onclick="handleLogin()">
+          <span class="btn-label">CONNEXION</span>
+          <span class="btn-loader hidden"><span class="spinner"></span></span>
+        </button>
+      </div>
+      <div class="login-footer">
+        <span class="footer-badge">OACI ANNEXE 14</span>
+        <span class="footer-badge">EVALUATION OLS</span>
+        <span class="footer-badge">Edited by A2G</span>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- ════════════════════════════════════════
+  <!-- ════════════════════════════════════════
      MAIN APP
 ════════════════════════════════════════ -->
-<div id="screen-app" class="screen">
+  <div id="screen-app" class="screen">
 
-  <!-- TOPBAR -->
-  <header class="topbar">
-    <div class="topbar-left">
-      <div class="app-logo">
-        <svg viewBox="0 0 32 32" fill="none" width="28" height="28">
-          <circle cx="16" cy="16" r="14" stroke="var(--cyan)" stroke-width="1.2" stroke-dasharray="3 1.5"/>
-          <circle cx="16" cy="16" r="8" stroke="var(--cyan)" stroke-width="0.8" opacity="0.5"/>
-          <circle cx="16" cy="16" r="2" fill="var(--cyan)"/>
-          <line x1="16" y1="2" x2="16" y2="8" stroke="var(--cyan)" stroke-width="1.2"/>
-          <polyline points="16,8 18,12 16,10 14,12 16,8" fill="var(--cyan)"/>
-        </svg>
-        <span class="app-name">SIGOBS</span>
-      </div>
-      <div class="topbar-sep"></div>
-      <div class="aerodrome-selector">
-        <label class="selector-label">AÉRODROME ACTIF</label>
-        <div class="selector-wrap">
-          <input id="icao-search" type="text" class="icao-input" placeholder="Code OACI" maxlength="4"
-            oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')loadAerodrome()"/>
-          <button class="btn-icon" onclick="loadAerodrome()" title="Charger aérodrome">
-            <svg viewBox="0 0 20 20" fill="none"><path d="M10 3v14M3 10h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          </button>
-        </div>
-        <div id="aerodrome-info" class="aerodrome-info hidden">
-          <span id="aerodrome-name" class="aero-name">—</span>
-          <span id="aerodrome-elev" class="aero-elev">ELEV — ft</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="topbar-center">
-      <nav class="tab-nav">
-        <button class="tab-btn active" onclick="switchTab(this,'analyse')">ANALYSE OLS</button>
-        <button class="tab-btn" onclick="switchTab(this,'obstacles')">OBSTACLES</button>
-        <button class="tab-btn" onclick="switchTab(this,'import')">IMPORT XML</button>
-      </nav>
-    </div>
-
-    <div class="topbar-right">
-      <span id="utc-time" class="utc-display">00:00:00Z</span>
-      <div class="user-pill">
-        <div class="user-avatar">
-          <svg viewBox="0 0 20 20" fill="none" width="14" height="14">
-            <circle cx="10" cy="7" r="3.5" stroke="currentColor" stroke-width="1.5"/>
-            <path d="M3 18c0-3.5 3.1-6 7-6s7 2.5 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="app-logo">
+          <svg viewBox="0 0 32 32" fill="none" width="28" height="28">
+            <circle cx="16" cy="16" r="14" stroke="var(--cyan)" stroke-width="1.2" stroke-dasharray="3 1.5" />
+            <circle cx="16" cy="16" r="8" stroke="var(--cyan)" stroke-width="0.8" opacity="0.5" />
+            <circle cx="16" cy="16" r="2" fill="var(--cyan)" />
+            <line x1="16" y1="2" x2="16" y2="8" stroke="var(--cyan)" stroke-width="1.2" />
+            <polyline points="16,8 18,12 16,10 14,12 16,8" fill="var(--cyan)" />
           </svg>
+          <span class="app-name">SIGOBS</span>
         </div>
-        <span id="user-name" class="user-name">—</span>
-        <span id="user-role" class="user-role-badge">—</span>
-      </div>
-      <button class="btn-icon btn-danger-ghost" onclick="handleLogout()" title="Déconnexion">
-        <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
-          <path d="M7 3H4a1 1 0 00-1 1v12a1 1 0 001 1h3M13 14l3-4-3-4M7 10h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-    </div>
-  </header>
+        <div class="topbar-sep"></div>
 
-  <!-- RUNWAY BAR -->
-  <div class="runway-bar">
-    <span class="runway-bar-label">PISTE :</span>
-    <div id="runway-tabs" class="runway-tabs">
-      <span class="no-runway-msg">— Aucun aérodrome chargé —</span>
-    </div>
-    <div class="runway-meta" id="runway-meta"></div>
-  </div>
-
-  <!-- ══ TAB: ANALYSE OLS ══ -->
-  <div id="tab-analyse" class="tab-content active">
-    <div class="app-layout">
-
-      <!-- LEFT PANEL — Saisie obstacle -->
-      <aside class="panel panel-left">
-        <div class="panel-header">
-          <span class="panel-title">SAISIE OBSTACLE</span>
-          <span class="panel-badge">DMS / DD</span>
-        </div>
-        <div class="panel-body">
-          <div class="field-group">
-            <label class="field-label">DÉSIGNATION</label>
-            <input id="obs-name" type="text" class="field-input" placeholder="Ex: Tour Pylône N°3"/>
+        <!-- AÉRODROME UNIQUE — Affichage statique -->
+        <div class="study-aerodrome-display">
+          <div class="study-aerodrome-badge">
+            <svg viewBox="0 0 20 20" fill="none" width="14" height="14" style="flex-shrink:0">
+              <path d="M10 2L3 7v11h5v-5h4v5h5V7L10 2z" stroke="var(--cyan)" stroke-width="1.3"
+                stroke-linejoin="round" />
+            </svg>
+            <span class="study-label">AÉRODROME D'ÉTUDE</span>
           </div>
-          <div class="field-group">
-            <label class="field-label">TYPE D'OBSTACLE</label>
-            <select id="obs-type" class="field-select">
+          <div class="study-aerodrome-info">
+            <span id="study-icao" class="study-icao">—</span>
+            <span id="study-name" class="study-name">Chargement…</span>
+            <span id="study-elev" class="study-elev">ELEV — ft</span>
+            <span id="study-status-dot" class="study-status-dot loading"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="topbar-center">
+        <nav class="tab-nav">
+          <button class="tab-btn active" id="tab-btn-analyse" onclick="switchTab(this,'analyse')">ANALYSE OLS</button>
+          <button class="tab-btn" id="tab-btn-obstacles" onclick="switchTab(this,'obstacles')">OBSTACLES</button>
+          <button class="tab-btn" id="tab-btn-runways" onclick="switchTab(this,'runways')">PISTES</button>
+          <button class="tab-btn" id="tab-btn-users" onclick="switchTab(this,'users')">UTILISATEURS</button>
+        </nav>
+      </div>
+
+      <div class="topbar-right">
+        <span id="utc-time" class="utc-display">00:00:00</span>
+        <div class="user-pill">
+          <div class="user-avatar">
+            <svg viewBox="0 0 20 20" fill="none" width="14" height="14">
+              <circle cx="10" cy="7" r="3.5" stroke="currentColor" stroke-width="1.5" />
+              <path d="M3 18c0-3.5 3.1-6 7-6s7 2.5 7 6" stroke="currentColor" stroke-width="1.5"
+                stroke-linecap="round" />
+            </svg>
+          </div>
+          <span id="user-name" class="user-name">—</span>
+          <span id="user-role" class="user-role-badge">—</span>
+        </div>
+        <button class="btn-icon btn-danger-ghost" onclick="handleLogout()" title="Déconnexion">
+          <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+            <path d="M7 3H4a1 1 0 00-1 1v12a1 1 0 001 1h3M13 14l3-4-3-4M7 10h9" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- RUNWAY BAR -->
+    <div class="runway-bar">
+      <span class="runway-bar-label">PISTE :</span>
+      <div id="runway-tabs" class="runway-tabs">
+        <span class="no-runway-msg">— Chargement de l'aérodrome d'étude —</span>
+      </div>
+      <div class="runway-meta" id="runway-meta"></div>
+    </div>
+
+    <!-- ══ TAB: ANALYSE OLS ══ -->
+    <div id="tab-analyse" class="tab-content active">
+      <div class="app-layout">
+
+        <!-- LEFT PANEL — Saisie obstacle -->
+        <aside class="panel panel-left">
+          <div class="panel-header">
+            <span class="panel-title">SAISIE OBSTACLE</span>
+            <span class="panel-badge">DMS / DD</span>
+          </div>
+          <div class="panel-body">
+            <div class="field-group">
+              <label class="field-label">DÉSIGNATION</label>
+              <input id="obs-name" type="text" class="field-input" placeholder="Ex: Tour Pylône N°3" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">PROPRIÉTAIRE DE L'OBSTACLE</label>
+              <input id="obs-proprietaire" type="text" class="field-input" placeholder="Ex: Société XYZ / M. Martin" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">TYPE D'OBSTACLE</label>
+              <select id="obs-type" class="field-select">
+                <option value="building">Bâtiment</option>
+                <option value="tower">Tour / Pylône</option>
+                <option value="vegetation">Végétation</option>
+                <option value="crane">Grue</option>
+                <option value="antenna">Antenne</option>
+                <option value="powerline">Ligne électrique</option>
+                <option value="water_tower">Château d'eau</option>
+                <option value="other">Autre</option>
+              </select>
+            </div>
+
+            <!-- Coords DMS/DD -->
+            <div class="coord-section">
+              <div class="coord-header">
+                <span class="coord-label">COORDONNÉES GÉOGRAPHIQUES</span>
+                <div class="coord-toggle">
+                  <button class="toggle-btn active" id="btn-dms" onclick="setCoordMode('dms')">DMS</button>
+                  <button class="toggle-btn" id="btn-dd" onclick="setCoordMode('dd')">DD</button>
+                </div>
+              </div>
+              <div id="coord-dms" class="coord-mode active">
+                <div class="dms-group">
+                  <label class="field-label">LATITUDE</label>
+                  <div class="dms-row">
+                    <div class="dms-field"><input id="lat-deg" type="number" class="field-input dms-input"
+                        placeholder="°" min="0" max="90" /><span class="dms-unit">°</span></div>
+                    <div class="dms-field"><input id="lat-min" type="number" class="field-input dms-input"
+                        placeholder="'" min="0" max="59" /><span class="dms-unit">'</span></div>
+                    <div class="dms-field"><input id="lat-sec" type="number" class="field-input dms-input"
+                        placeholder='"' min="0" max="59.99" step="0.01" /><span class="dms-unit">"</span></div>
+                    <select id="lat-hem" class="field-select dms-hem">
+                      <option value="N">N</option>
+                      <option value="S">S</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="dms-group">
+                  <label class="field-label">LONGITUDE</label>
+                  <div class="dms-row">
+                    <div class="dms-field"><input id="lon-deg" type="number" class="field-input dms-input"
+                        placeholder="°" min="0" max="180" /><span class="dms-unit">°</span></div>
+                    <div class="dms-field"><input id="lon-min" type="number" class="field-input dms-input"
+                        placeholder="'" min="0" max="59" /><span class="dms-unit">'</span></div>
+                    <div class="dms-field"><input id="lon-sec" type="number" class="field-input dms-input"
+                        placeholder='"' min="0" max="59.99" step="0.01" /><span class="dms-unit">"</span></div>
+                    <select id="lon-hem" class="field-select dms-hem">
+                      <option value="E">E</option>
+                      <option value="W">W</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div id="coord-dd" class="coord-mode">
+                <div class="field-group">
+                  <label class="field-label">LATITUDE (DD)</label>
+                  <input id="lat-dd" type="number" class="field-input" placeholder="-90 à 90" step="0.000001" min="-90"
+                    max="90" />
+                </div>
+                <div class="field-group">
+                  <label class="field-label">LONGITUDE (DD)</label>
+                  <input id="lon-dd" type="number" class="field-input" placeholder="-180 à 180" step="0.000001"
+                    min="-180" max="180" />
+                </div>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label">ALTITUDE SOMMET (ft AMSL)</label>
+              <div class="field-wrap">
+                <input id="obs-alt" type="number" class="field-input" placeholder="ex: 285" min="0" step="1" />
+                <span class="field-unit">ft</span>
+              </div>
+            </div>
+            <div class="field-group">
+              <label class="field-label">HAUTEUR (ft AGL)</label>
+              <div class="field-wrap">
+                <input id="obs-height" type="number" class="field-input" placeholder="ex: 52" min="0" step="1" />
+                <span class="field-unit">ft</span>
+              </div>
+            </div>
+            <div class="field-group">
+              <label class="field-label">STATUT TEMPOREL</label>
+              <select id="obs-temporal" class="field-select">
+                <option value="permanent">Permanent</option>
+                <option value="temporary">Temporaire</option>
+              </select>
+            </div>
+            <div id="expiry-group" class="field-group hidden">
+              <label class="field-label">DATE D'EXPIRATION</label>
+              <input id="obs-expiry" type="date" class="field-input" />
+            </div>
+            <button class="btn-primary btn-full" onclick="submitObstacle()">
+              <svg viewBox="0 0 20 20" fill="none" width="16" height="16">
+                <path d="M10 3v14M3 10h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+              AJOUTER L'OBSTACLE
+            </button>
+          </div>
+        </aside>
+
+        <!-- CENTER PANEL — Carte MapLibre 3D géoréférencée -->
+        <main class="panel panel-center" id="map3d-panel">
+          <div class="panel-header">
+            <span class="panel-title">CARTE SATELLITE 3D — SURFACES OLS GÉORÉFÉRENCÉES</span>
+            <div class="panel-actions">
+              <span id="active-runway-label" class="active-runway">— Aucune piste —</span>
+              <div class="map3d-controls">
+                <button class="btn-icon-sm" onclick="map3dResetCamera()" title="Recentrer">⊕ RECENTRER</button>
+                <button class="btn-icon-sm" onclick="map3dToggleLabels()" title="Labels obstacles">≡ LABELS</button>
+                <button class="btn-icon-sm btn-pdf" onclick="generatePdfReport()" title="Rapport PDF">↓ PDF</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- MapLibre container (position relative pour les éléments flottants) -->
+          <div id="map3d-container" class="map3d-container">
+            <!-- Bouton flottant pour ouvrir/fermer le panneau de surfaces -->
+            <button id="legend-toggle-btn" class="legend-toggle-btn" onclick="toggleLegendPanel()" title="Surfaces OLS">
+              <svg viewBox="0 0 20 20" fill="none" width="15" height="15">
+                <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+              <span style="font-family:var(--font-head);font-size:8px;letter-spacing:0.1em;">SURFACES</span>
+            </button>
+
+            <!-- Panneau vertical de masquage (glisse depuis la gauche) -->
+            <div id="surfaces-legend-panel" class="surfaces-legend-panel">
+              <div class="surfaces-legend-header">
+                <span>SURFACES OLS</span>
+                <button onclick="toggleLegendPanel()"
+                  style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:14px;line-height:1;">&#x2715;</button>
+              </div>
+              <div class="surfaces-legend-actions">
+                <button onclick="selectAllSurfaces()"
+                  style="font-family:var(--font-mono);font-size:9px;color:var(--cyan);background:none;border:none;cursor:pointer;padding:0;">Tout
+                  activer</button>
+                <span style="color:var(--text-dim);">|</span>
+                <button onclick="deselectAllSurfaces()"
+                  style="font-family:var(--font-mono);font-size:9px;color:var(--text-secondary);background:none;border:none;cursor:pointer;padding:0;">Tout
+                  masquer</button>
+              </div>
+              <div id="map3d-legend-surfaces" class="surfaces-legend-list">
+                <!-- Rempli dynamiquement par updateSurfaceLegend() -->
+              </div>
+            </div>
+
+            <div class="map3d-overlay" id="map3d-empty">
+              <div class="map3d-empty-msg">
+                <svg viewBox="0 0 64 64" fill="none" width="56" height="56" opacity="0.3">
+                  <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="1.5" />
+                  <path d="M32 8 Q44 20 44 32 Q44 48 32 56 Q20 48 20 32 Q20 20 32 8Z" stroke="currentColor"
+                    stroke-width="1.5" fill="none" />
+                  <line x1="4" y1="32" x2="60" y2="32" stroke="currentColor" stroke-width="1" />
+                  <line x1="10" y1="18" x2="54" y2="18" stroke="currentColor" stroke-width="0.7" opacity="0.5" />
+                  <line x1="10" y1="46" x2="54" y2="46" stroke="currentColor" stroke-width="0.7" opacity="0.5" />
+                </svg>
+                <p>Chargement de l'aérodrome<br>d'étude en cours…</p>
+                <span class="map-hint-small">Les surfaces OLS sont générées<br>par le moteur backend Annexe 14</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hint navigation -->
+          <div class="map3d-hint">
+            <span>🖱 Glisser : orbite</span>
+            <span>⚙ Molette : zoom</span>
+            <span>⇧ Shift+Glisser : pan</span>
+            <span>🖱 Clic obstacle : infos</span>
+          </div>
+        </main>
+
+        <!-- RIGHT PANEL — Conformité -->
+        <aside class="panel panel-right conformity-panel">
+
+          <!-- Bloc statut -->
+          <div class="conf-status-block" id="conf-status-block">
+            <div class="conf-label-top">STATUT DE CONFORMITÉ</div>
+            <div class="conf-main-status" id="conf-main-status">—</div>
+            <div class="conf-sub" id="conf-sub">AUCUNE DONNÉE</div>
+          </div>
+
+          <!-- Métriques -->
+          <div class="conf-metrics-grid">
+            <div class="conf-metric-box">
+              <span class="conf-metric-label">OBSTACLES</span>
+              <span class="conf-metric-val big" id="conf-obs-count">0</span>
+            </div>
+            <div class="conf-metric-box">
+              <span class="conf-metric-label">PÉNÉTRATIONS</span>
+              <span class="conf-metric-val big danger" id="conf-penetrations">0</span>
+            </div>
+          </div>
+
+          <!-- Tableau percements (rempli après évaluation) -->
+          <div class="conf-surfaces-header">
+            <span>SURFACE</span><span>PENTE</span><span>LIM.Z</span><span>OBS.Z</span><span>ÉTAT</span>
+          </div>
+          <div class="conf-surfaces-list" id="conf-surfaces-list">
+            <div class="conf-surface-row empty"><span>—</span></div>
+          </div>
+
+          <!-- Piste active -->
+          <div class="info-block" style="margin:8px;">
+            <div class="info-title">PISTE ACTIVE</div>
+            <div class="info-row"><span>Désignation</span><span id="rwy-desig">—</span></div>
+            <div class="info-row"><span>Longueur</span><span id="rwy-length">—</span></div>
+            <div class="info-row"><span>Largeur</span><span id="rwy-width">—</span></div>
+            <div class="info-row"><span>Cap vrai</span><span id="rwy-bearing">—</span></div>
+            <div class="info-row"><span>Élévation</span><span id="rwy-elev">—</span></div>
+            <div class="info-row"><span>Code OACI</span><span id="rwy-code">—</span></div>
+          </div>
+
+          <!-- En attente validation -->
+          <div class="section-header" style="margin:0 8px;">
+            <span class="section-title">EN ATTENTE DE VALIDATION</span>
+            <span class="warn-badge amber" id="pending-count">0</span>
+          </div>
+          <div id="pending-list" class="expiry-list" style="margin:0 8px 6px;">
+            <span class="empty-msg">Aucun élément en attente</span>
+          </div>
+
+          <!-- API status -->
+          <div class="status-card" style="margin:8px;">
+            <div class="status-row">
+              <span class="status-dot" id="api-dot"></span>
+              <span class="status-label">API Backend</span>
+              <span class="status-val" id="api-status-text">—</span>
+            </div>
+          </div>
+
+          <div class="conf-engine-line">Moteur : API Backend PANS-OPS · Annexe 14</div>
+        </aside>
+
+      </div>
+    </div><!-- /tab-analyse -->
+
+    <!-- ══ TAB: OBSTACLES ══ -->
+    <div id="tab-obstacles" class="tab-content">
+      <div class="obstacles-page">
+        <div class="obs-page-header">
+          <div class="obs-filters">
+            <input id="obs-search" type="text" class="field-input" placeholder="Rechercher un obstacle…"
+              oninput="filterObstacles()" style="width:220px;" />
+            <select id="obs-filter-status" class="field-select" onchange="filterObstacles()" style="width:160px;">
+              <option value="">Tous les statuts</option>
+              <option value="draft">Brouillon</option>
+              <option value="pending">En attente</option>
+              <option value="validated">Validé</option>
+            </select>
+            <select id="obs-filter-type" class="field-select" onchange="filterObstacles()" style="width:160px;">
+              <option value="">Tous les types</option>
               <option value="building">Bâtiment</option>
               <option value="tower">Tour / Pylône</option>
               <option value="vegetation">Végétation</option>
@@ -187,363 +455,216 @@
               <option value="water_tower">Château d'eau</option>
               <option value="other">Autre</option>
             </select>
+            <label class="toggle-label">
+              <input type="checkbox" id="obs-filter-breach" onchange="filterObstacles()" />
+              <span>Pénétrations uniquement</span>
+            </label>
           </div>
-          <!-- Coords DMS/DD -->
-          <div class="coord-section">
-            <div class="coord-header">
-              <span class="coord-label">COORDONNÉES GÉOGRAPHIQUES</span>
-              <div class="coord-toggle">
-                <button class="toggle-btn active" id="btn-dms" onclick="setCoordMode('dms')">DMS</button>
-                <button class="toggle-btn" id="btn-dd" onclick="setCoordMode('dd')">DD</button>
-              </div>
-            </div>
-            <div id="coord-dms" class="coord-mode active">
-              <div class="dms-group">
-                <label class="field-label">LATITUDE</label>
-                <div class="dms-row">
-                  <div class="dms-field"><input id="lat-deg" type="number" class="field-input dms-input" placeholder="°" min="0" max="90"/><span class="dms-unit">°</span></div>
-                  <div class="dms-field"><input id="lat-min" type="number" class="field-input dms-input" placeholder="'" min="0" max="59"/><span class="dms-unit">'</span></div>
-                  <div class="dms-field"><input id="lat-sec" type="number" class="field-input dms-input" placeholder='"' min="0" max="59.99" step="0.01"/><span class="dms-unit">"</span></div>
-                  <select id="lat-hem" class="field-select dms-hem"><option value="N">N</option><option value="S">S</option></select>
-                </div>
-              </div>
-              <div class="dms-group">
-                <label class="field-label">LONGITUDE</label>
-                <div class="dms-row">
-                  <div class="dms-field"><input id="lon-deg" type="number" class="field-input dms-input" placeholder="°" min="0" max="180"/><span class="dms-unit">°</span></div>
-                  <div class="dms-field"><input id="lon-min" type="number" class="field-input dms-input" placeholder="'" min="0" max="59"/><span class="dms-unit">'</span></div>
-                  <div class="dms-field"><input id="lon-sec" type="number" class="field-input dms-input" placeholder='"' min="0" max="59.99" step="0.01"/><span class="dms-unit">"</span></div>
-                  <select id="lon-hem" class="field-select dms-hem"><option value="E">E</option><option value="W">W</option></select>
-                </div>
-              </div>
-            </div>
-            <div id="coord-dd" class="coord-mode">
-              <div class="field-group">
-                <label class="field-label">LATITUDE (DD)</label>
-                <input id="lat-dd" type="number" class="field-input" placeholder="-90 à 90" step="0.000001" min="-90" max="90"/>
-              </div>
-              <div class="field-group">
-                <label class="field-label">LONGITUDE (DD)</label>
-                <input id="lon-dd" type="number" class="field-input" placeholder="-180 à 180" step="0.000001" min="-180" max="180"/>
-              </div>
-            </div>
-          </div>
-          <div class="field-group">
-            <label class="field-label">ALTITUDE SOMMET (ft AMSL)</label>
-            <div class="field-wrap">
-              <input id="obs-alt" type="number" class="field-input" placeholder="ex: 285" min="0" step="1"/>
-              <span class="field-unit">ft</span>
-            </div>
-          </div>
-          <div class="field-group">
-            <label class="field-label">HAUTEUR (ft AGL)</label>
-            <div class="field-wrap">
-              <input id="obs-height" type="number" class="field-input" placeholder="ex: 52" min="0" step="1"/>
-              <span class="field-unit">ft</span>
-            </div>
-          </div>
-          <div class="field-group">
-            <label class="field-label">STATUT TEMPOREL</label>
-            <select id="obs-temporal" class="field-select">
-              <option value="permanent">Permanent</option>
-              <option value="temporary">Temporaire</option>
-            </select>
-          </div>
-          <div id="expiry-group" class="field-group hidden">
-            <label class="field-label">DATE D'EXPIRATION</label>
-            <input id="obs-expiry" type="date" class="field-input"/>
-          </div>
-          <button class="btn-primary btn-full" onclick="submitObstacle()">
-            <svg viewBox="0 0 20 20" fill="none" width="16" height="16">
-              <path d="M10 3v14M3 10h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            AJOUTER L'OBSTACLE
-          </button>
-        </div>
-      </aside>
-
-      <!-- CENTER PANEL — Carte Mapbox 3D géoréférencée -->
-      <main class="panel panel-center" id="map3d-panel">
-        <div class="panel-header">
-          <span class="panel-title">CARTE SATELLITE 3D — SURFACES OLS GÉORÉFÉRENCÉES</span>
-          <div class="panel-actions">
-            <span id="active-runway-label" class="active-runway">— Aucune piste —</span>
-            <div class="map3d-controls">
-              <button class="btn-icon-sm" onclick="map3dResetCamera()" title="Recentrer">⊕ RECENTRER</button>
-              <button class="btn-icon-sm" onclick="map3dToggleLabels()" title="Labels obstacles">≡ LABELS</button>
-              <button class="btn-icon-sm btn-pdf" onclick="generatePdfReport()" title="Rapport PDF">↓ PDF</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Légende surfaces -->
-        <div class="map3d-legend">
-          <div class="legend-item"><span class="legend-dot" style="background:#00E5FF"></span>Approche</div>
-          <div class="legend-item"><span class="legend-dot" style="background:#CE93D8"></span>Transition</div>
-          <div class="legend-item"><span class="legend-dot" style="background:#69F0AE"></span>IHS (45m)</div>
-          <div class="legend-item"><span class="legend-dot" style="background:#FFD54F"></span>Conique</div>
-          <div class="legend-item"><span class="legend-dot" style="background:#FF9100"></span>TOCS</div>
-          <div class="legend-item"><span class="legend-dot" style="background:#FF1744"></span>Obstacle ✗</div>
-          <div class="legend-item"><span class="legend-dot" style="background:#00E676"></span>Obstacle ✓</div>
-        </div>
-
-        <!-- Mapbox container -->
-        <div id="map3d-container" class="map3d-container">
-          <!-- Mapbox GL monte ici dynamiquement via JS -->
-          <div class="map3d-overlay" id="map3d-empty">
-            <div class="map3d-empty-msg">
-              <svg viewBox="0 0 64 64" fill="none" width="56" height="56" opacity="0.3">
-                <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="1.5"/>
-                <path d="M32 8 Q44 20 44 32 Q44 48 32 56 Q20 48 20 32 Q20 20 32 8Z" stroke="currentColor" stroke-width="1.5" fill="none"/>
-                <line x1="4" y1="32" x2="60" y2="32" stroke="currentColor" stroke-width="1"/>
-                <line x1="10" y1="18" x2="54" y2="18" stroke="currentColor" stroke-width="0.7" opacity="0.5"/>
-                <line x1="10" y1="46" x2="54" y2="46" stroke="currentColor" stroke-width="0.7" opacity="0.5"/>
+          <div style="display:flex; gap:10px;">
+            <button class="btn-primary" onclick="loadObstaclesList()">
+              <svg viewBox="0 0 20 20" fill="none" width="14" height="14">
+                <path d="M4 12a6 6 0 1010.66-3.61M4 12V7.5M4 12H8.5" stroke="currentColor" stroke-width="1.6"
+                  stroke-linecap="round" />
               </svg>
-              <p>Chargez un aérodrome<br>pour afficher la carte satellite 3D</p>
-              <span class="map-hint-small">Les surfaces OLS seront tracées<br>sur les coordonnées géographiques réelles</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Hint navigation -->
-        <div class="map3d-hint">
-          <span>🖱 Glisser : orbite</span>
-          <span>⚙ Molette : zoom</span>
-          <span>⇧ Shift+Glisser : pan</span>
-          <span>🖱 Clic obstacle : infos</span>
-        </div>
-      </main>
-
-      <!-- RIGHT PANEL — Conformité (style Image 1) -->
-      <aside class="panel panel-right conformity-panel">
-
-        <!-- Bloc statut -->
-        <div class="conf-status-block" id="conf-status-block">
-          <div class="conf-label-top">STATUT DE CONFORMITÉ</div>
-          <div class="conf-main-status" id="conf-main-status">—</div>
-          <div class="conf-sub" id="conf-sub">AUCUNE DONNÉE</div>
-        </div>
-
-        <!-- Métriques 2×2 -->
-        <div class="conf-metrics-grid">
-          <div class="conf-metric-box">
-            <span class="conf-metric-label">ALTITUDE MAX</span>
-            <span class="conf-metric-val" id="conf-alt-max">— m</span>
-          </div>
-          <div class="conf-metric-box">
-            <span class="conf-metric-label">DÉGAGEMENT</span>
-            <span class="conf-metric-val" id="conf-clearance">— m</span>
-          </div>
-          <div class="conf-metric-box">
-            <span class="conf-metric-label">OBSTACLES</span>
-            <span class="conf-metric-val big" id="conf-obs-count">0</span>
-          </div>
-          <div class="conf-metric-box">
-            <span class="conf-metric-label">PÉNÉTRATIONS</span>
-            <span class="conf-metric-val big danger" id="conf-penetrations">0</span>
-          </div>
-        </div>
-
-        <!-- Tableau surfaces -->
-        <div class="conf-surfaces-header">
-          <span>SURFACE</span><span>PENTE</span><span>LIM.Z</span><span>OBS.Z</span><span>ÉTAT</span>
-        </div>
-        <div class="conf-surfaces-list" id="conf-surfaces-list">
-          <div class="conf-surface-row empty"><span>—</span></div>
-        </div>
-
-      
-        <!-- Référence normative -->
-         <!--
-        <div class="conf-ref-block">
-          <div class="conf-ref-title">— RÉFÉRENCE NORMATIVE</div>
-          <div class="conf-ref-line">ICAO DOC 9157 PARTIE 6</div>
-          <div class="conf-ref-line">ICAO ANNEX 14 VOL I</div>
-          <div class="conf-ref-line" id="conf-ref-code">CODE : —</div>
-        </div>
-          -->
-        <!-- Piste active -->
-        <div class="info-block" style="margin:8px;">
-          <div class="info-title">PISTE ACTIVE</div>
-          <div class="info-row"><span>Désignation</span><span id="rwy-desig">—</span></div>
-          <div class="info-row"><span>Longueur</span><span id="rwy-length">—</span></div>
-          <div class="info-row"><span>Largeur</span><span id="rwy-width">—</span></div>
-          <div class="info-row"><span>Cap vrai</span><span id="rwy-bearing">—</span></div>
-          <div class="info-row"><span>Élévation</span><span id="rwy-elev">—</span></div>
-          <div class="info-row"><span>Code OACI</span><span id="rwy-code">—</span></div>
-        </div>
-
-        <!-- Alertes expiration -->
-        <div class="section-header" style="margin:0 8px;">
-          <span class="section-title">ALERTES EXPIRATION</span>
-          <span class="warn-badge" id="expiry-count">0</span>
-        </div>
-        <div id="expiry-list" class="expiry-list" style="margin:0 8px 6px;">
-          <span class="empty-msg">Aucune alerte</span>
-        </div>
-
-        <!-- En attente validation -->
-        <div class="section-header" style="margin:0 8px;">
-          <span class="section-title">EN ATTENTE DE VALIDATION</span>
-          <span class="warn-badge amber" id="pending-count">0</span>
-        </div>
-        <div id="pending-list" class="expiry-list" style="margin:0 8px 6px;">
-          <span class="empty-msg">Aucun élément en attente</span>
-        </div>
-
-        <!-- API status -->
-        <div class="status-card" style="margin:8px;">
-          <div class="status-row">
-            <span class="status-dot" id="api-dot"></span>
-            <span class="status-label">API Backend</span>
-            <span class="status-val" id="api-status-text">—</span>
-          </div>
-        </div>
-
-        <div class="conf-engine-line">Moteur : V5.0_MAP2026</div>
-      </aside>
-
-    </div>
-  </div><!-- /tab-analyse -->
-
-  <!-- ══ TAB: OBSTACLES ══ -->
-  <div id="tab-obstacles" class="tab-content">
-    <div class="obstacles-page">
-      <div class="obs-page-header">
-        <div class="obs-filters">
-          <input id="obs-search" type="text" class="field-input" placeholder="Rechercher un obstacle…" oninput="filterObstacles()" style="width:220px;"/>
-          <select id="obs-filter-status" class="field-select" onchange="filterObstacles()" style="width:160px;">
-            <option value="">Tous les statuts</option>
-            <option value="draft">Brouillon</option>
-            <option value="pending">En attente</option>
-            <option value="validated">Validé</option>
-          </select>
-          <select id="obs-filter-type" class="field-select" onchange="filterObstacles()" style="width:160px;">
-            <option value="">Tous les types</option>
-            <option value="building">Bâtiment</option>
-            <option value="tower">Tour / Pylône</option>
-            <option value="vegetation">Végétation</option>
-            <option value="crane">Grue</option>
-            <option value="antenna">Antenne</option>
-            <option value="powerline">Ligne électrique</option>
-            <option value="water_tower">Château d'eau</option>
-            <option value="other">Autre</option>
-          </select>
-          <label class="toggle-label">
-            <input type="checkbox" id="obs-filter-breach" onchange="filterObstacles()"/>
-            <span>Pénétrations uniquement</span>
-          </label>
-        </div>
-        <button class="btn-primary" onclick="loadObstaclesList()">
-          <svg viewBox="0 0 20 20" fill="none" width="14" height="14">
-            <path d="M4 12a6 6 0 1010.66-3.61M4 12V7.5M4 12H8.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-          </svg>
-          ACTUALISER
-        </button>
-      </div>
-      <div class="table-wrap" style="flex:1;max-height:none;">
-        <table class="data-table">
-          <thead><tr>
-            <th>DÉSIGNATION</th><th>TYPE</th><th>LATITUDE</th><th>LONGITUDE</th>
-            <th>ALT. (ft)</th><th>HAUT. (ft)</th><th>TEMPOREL</th>
-            <th>WORKFLOW</th><th>VERDICT OLS</th><th>ACTIONS</th>
-          </tr></thead>
-          <tbody id="obs-list-tbody">
-            <tr class="table-placeholder"><td colspan="10">Chargez un aérodrome pour afficher les obstacles</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div><!-- /tab-obstacles -->
-
-  <!-- ══ TAB: IMPORT AIXM ══ -->
-  <div id="tab-import" class="tab-content">
-    <div class="import-page">
-      <div class="import-left">
-        <div class="panel-header">
-          <span class="panel-title">IMPORT XML / AIXM 5.1</span>
-          <span class="panel-badge cyan">XML</span>
-        </div>
-        <div class="panel-body">
-          <div class="import-info">
-            <p>Importez un fichier <strong>AIXM 5.1</strong> pour charger automatiquement les obstacles sur la carte satellite géoréférencée.</p>
-            <p>Formats supportés : <code>.xml</code>, <code>.aixm</code></p>
-          </div>
-          <div class="drop-zone" id="drop-zone"
-            ondrop="handleFileDrop(event)"
-            ondragover="event.preventDefault();this.classList.add('drag-over')"
-            ondragleave="this.classList.remove('drag-over')"
-            onclick="document.getElementById('aixm-file').click()">
-            <div class="drop-icon">
-              <svg viewBox="0 0 48 48" fill="none" width="44" height="44">
-                <rect x="10" y="8" width="28" height="32" rx="3" stroke="currentColor" stroke-width="1.5"/>
-                <path d="M16 20h16M16 26h10M16 32h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                <path d="M32 8v8h8" stroke="currentColor" stroke-width="1.5"/>
+              ACTUALISER
+            </button>
+            <button id="btn-toggle-all-obs" class="btn-primary" onclick="toggleAllObstacles()"
+              style="display:none; background-color: var(--amber);">
+              <svg viewBox="0 0 20 20" fill="none" width="14" height="14">
+                <path
+                  d="M10 12a2 2 0 100-4 2 2 0 000 4zM2 10C3.5 6 6.5 4 10 4s6.5 2 8.5 6c-1.5 4-4.5 6-8.5 6S3.5 14 2 10z"
+                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
               </svg>
-            </div>
-            <span class="drop-text">Glisser-déposer un fichier XML / AIXM</span>
-            <span class="drop-sub">ou cliquer pour parcourir</span>
-            <input type="file" id="aixm-file" accept=".xml,.aixm" style="display:none;" onchange="handleFileSelect(event)"/>
+              <span id="btn-toggle-all-obs-text">AFFICHER TOUS LES OBSTACLES</span>
+            </button>
           </div>
-          <div id="file-preview" class="file-preview hidden">
-            <div class="file-info-row">
-              <svg viewBox="0 0 20 20" fill="none" width="16" height="16">
-                <path d="M6 2h8l4 4v12a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2z" stroke="currentColor" stroke-width="1.5"/>
-                <path d="M14 2v6h6" stroke="currentColor" stroke-width="1.5"/>
-              </svg>
-              <span id="file-name">—</span>
-              <span id="file-size" class="file-size">—</span>
-            </div>
-            <button class="btn-danger-ghost btn-sm" onclick="clearFile()">Supprimer</button>
-          </div>
-          <div class="field-group" style="margin-top:12px;">
-            <label class="field-label">MODE D'IMPORT</label>
-            <div class="radio-group">
-              <label class="radio-label"><input type="radio" name="import-mode" value="surfaces" checked/> Surfaces OLS uniquement</label>
-              <!--
-              <label class="radio-label"><input type="radio" name="import-mode" value="obstacles"/> Obstacles uniquement</label>
-              <label class="radio-label"><input type="radio" name="import-mode" value="all"/> Surfaces + Obstacles</label>
-              -->
-            </div>
-          </div>
-          <button class="btn-primary btn-full" id="btn-import" onclick="runAixmImport()" disabled>LANCER L'IMPORT</button>
+        </div>
+        <div class="table-wrap" style="flex:1;max-height:none;">
+          <table class="data-table">
+            <thead>
+              <tr id="obs-table-head">
+                <th>DÉSIGNATION</th>
+                <th>TYPE</th>
+                <th>PROPRIÉTAIRE</th>
+                <th>LATITUDE</th>
+                <th>LONGITUDE</th>
+                <th>ALT. (ft)</th>
+                <th>HAUT. (ft)</th>
+                <th>TEMPOREL</th>
+                <th>WORKFLOW</th>
+                <th>VERDICT OLS</th>
+                <th id="obs-col-soumis" style="display:none">SOUMIS PAR</th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody id="obs-list-tbody">
+              <tr class="table-placeholder">
+                <td colspan="12">Chargement des obstacles de l'aérodrome d'étude…</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
-      <div class="import-right">
-        <div class="panel-header">
-          <span class="panel-title">JOURNAL D'IMPORT</span>
-          <button class="btn-icon-sm" onclick="clearLog()">EFFACER</button>
-        </div>
-        <div id="import-log" class="import-log">
-          <span class="log-line log-info">Aucun import effectué.</span>
-        </div>
-        <div class="panel-header" style="margin-top:16px;">
-          <span class="panel-title">APERÇU XML</span>
-        </div>
-        <div id="xml-preview" class="xml-preview">
-          <span class="empty-msg">Chargez un fichier pour prévisualiser</span>
-        </div>
+    </div><!-- /tab-obstacles -->
+
+    <!-- ══ TAB: RUNWAYS ══ -->
+    <div id="tab-runways" class="tab-content">
+      <div class="app-layout">
+        <aside class="panel panel-left" style="width:320px;">
+          <div class="panel-header"><span class="panel-title">NOUVELLE PISTE</span></div>
+          <div class="panel-body">
+            <div class="field-group">
+              <label class="field-label">QFU 1 / QFU 2</label>
+              <div class="dms-row">
+                <input id="rwy-add-qfu1" type="text" class="field-input" placeholder="ex: 04" />
+                <span class="dms-unit">/</span>
+                <input id="rwy-add-qfu2" type="text" class="field-input" placeholder="ex: 22" />
+              </div>
+            </div>
+            <div class="field-group">
+              <label class="field-label">LONGUEUR / LARGEUR (m)</label>
+              <div class="dms-row">
+                <input id="rwy-add-longueur" type="number" class="field-input" placeholder="L (m)" />
+                <span class="dms-unit">×</span>
+                <input id="rwy-add-largeur" type="number" class="field-input" placeholder="l (m)" />
+              </div>
+            </div>
+            <div class="field-group">
+              <label class="field-label">CODE RÉFÉRENCE OACI</label>
+              <input id="rwy-add-code-ref" type="text" class="field-input" placeholder="ex: 4E" />
+            </div>
+
+            <div class="coord-section" style="margin-top:10px;">
+              <span class="coord-label">COORDONNÉES SEUIL 1</span>
+              <div class="dms-row">
+                <input id="rwy-seuil1-lat" type="number" class="field-input" placeholder="Lat (DD)" step="0.000001" />
+                <input id="rwy-seuil1-lon" type="number" class="field-input" placeholder="Lon (DD)" step="0.000001" />
+              </div>
+              <input id="rwy-seuil1-alt" type="number" class="field-input" placeholder="Altitude (ft)"
+                style="margin-top:4px;" />
+            </div>
+            <div class="coord-section" style="margin-top:10px;">
+              <span class="coord-label">COORDONNÉES SEUIL 2</span>
+              <div class="dms-row">
+                <input id="rwy-seuil2-lat" type="number" class="field-input" placeholder="Lat (DD)" step="0.000001" />
+                <input id="rwy-seuil2-lon" type="number" class="field-input" placeholder="Lon (DD)" step="0.000001" />
+              </div>
+              <input id="rwy-seuil2-alt" type="number" class="field-input" placeholder="Altitude (ft)"
+                style="margin-top:4px;" />
+            </div>
+
+            <div class="field-group" style="margin-top:10px;">
+              <label class="field-label">TYPES D'APPROCHE (QFU 1/2)</label>
+              <label class="toggle-label"><input type="checkbox" id="rwy-approche-vue" /> Vue</label>
+              <label class="toggle-label"><input type="checkbox" id="rwy-approche-classique" /> Classique</label>
+              <label class="toggle-label"><input type="checkbox" id="rwy-approche-precision" /> Précision</label>
+            </div>
+            <div class="field-group" style="margin-top:10px;">
+              <label class="field-label">TYPES DE DÉCOLLAGE (QFU 1/2)</label>
+              <label class="toggle-label"><input type="checkbox" id="rwy-decollage-odp" /> ODP</label>
+              <label class="toggle-label"><input type="checkbox" id="rwy-decollage-sid" /> SID</label>
+              <label class="toggle-label"><input type="checkbox" id="rwy-decollage-omnidirectionnel" />
+                Omnidirectionnel</label>
+            </div>
+
+            <button class="btn-primary btn-full" onclick="submitRunway()" style="margin-top:15px;">
+              AJOUTER LA PISTE
+            </button>
+          </div>
+        </aside>
+        <main class="panel panel-center" style="padding:20px; overflow-y:auto;">
+          <div class="section-header" style="margin-bottom:15px;">
+            <span class="section-title" style="font-size:14px;">PISTES DE L'AÉRODROME</span>
+          </div>
+          <div id="runways-mgmt-list" style="display:flex; flex-direction:column; gap:10px;">
+            <div class="table-placeholder">Chargement des pistes…</div>
+          </div>
+        </main>
       </div>
-    </div>
-  </div><!-- /tab-import -->
+    </div><!-- /tab-runways -->
 
-</div><!-- /screen-app -->
+    <!-- ══ TAB: USERS ══ -->
+    <div id="tab-users" class="tab-content">
+      <div class="app-layout">
+        <aside class="panel panel-left" style="width:320px;">
+          <div class="panel-header"><span class="panel-title">NOUVEL UTILISATEUR</span></div>
+          <div class="panel-body">
+            <div class="field-group">
+              <label class="field-label">EMAIL</label>
+              <input id="user-email" type="email" class="field-input" placeholder="utilisateur@domaine.com" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">MOT DE PASSE</label>
+              <input id="user-password" type="password" class="field-input" placeholder="••••••••" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">RÔLE</label>
+              <select id="user-role-select" class="field-select">
+                <option value="">— Choisir un rôle —</option>
+              </select>
+            </div>
+            <button class="btn-primary btn-full" onclick="createUser()" style="margin-top:15px;">
+              CRÉER L'UTILISATEUR
+            </button>
+            <hr style="border:none; border-top:1px solid var(--border); margin:15px 0;" />
+            <div class="field-group">
+              <label class="field-label">NOUVEAU RÔLE</label>
+              <input id="role-name-input" type="text" class="field-input" placeholder="Nom du rôle" />
+              <button class="btn-ghost" onclick="createRole()" style="margin-top:5px;">CRÉER LE RÔLE</button>
+            </div>
+          </div>
+        </aside>
+        <main class="panel panel-center" style="padding:20px; overflow-y:auto;">
+          <div class="section-header" style="margin-bottom:15px; display:flex; justify-content:space-between;">
+            <span class="section-title" style="font-size:14px;">UTILISATEURS</span>
+            <button class="btn-ghost btn-sm" onclick="loadUsers()">ACTUALISER</button>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>EMAIL</th>
+                <th>RÔLE</th>
+                <th>AÉRODROME ASSOCIÉ</th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody id="users-list-tbody">
+              <tr class="table-placeholder">
+                <td colspan="4">Veuillez patienter…</td>
+              </tr>
+            </tbody>
+          </table>
+        </main>
+      </div>
+    </div><!-- /tab-users -->
 
-<!-- Toasts -->
-<div id="toast-container" class="toast-container"></div>
+  </div><!-- /screen-app -->
 
-<!-- Modal -->
-<div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal()">
-  <div class="modal-box" onclick="event.stopPropagation()">
-    <div class="modal-title" id="modal-title">Confirmation</div>
-    <div class="modal-body" id="modal-body"></div>
-    <div class="modal-actions">
-      <button class="btn-ghost" onclick="closeModal()">ANNULER</button>
-      <button class="btn-danger" onclick="confirmModalAction()">CONFIRMER</button>
+  <!-- Toasts -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Modal -->
+  <div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-title" id="modal-title">Confirmation</div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="closeModal()">ANNULER</button>
+        <button class="btn-danger" onclick="confirmModalAction()">CONFIRMER</button>
+      </div>
     </div>
   </div>
-</div>
 
-<script src="app.js"></script>
+  <!-- SIGOBS — Modules JS (ordre de chargement obligatoire) -->
+  <script src="js/config.js"></script> <!-- 1. État global, constantes, init DOMContentLoaded -->
+  <script src="js/api.js"></script> <!-- 2. apiFetch, normalisation, helpers, toasts, modal -->
+  <script src="js/auth.js"></script> <!-- 3. Login, logout, restauration session -->
+  <script src="js/aerodrome.js"></script> <!-- 4. Chargement aérodrome, pistes -->
+  <script src="js/obstacles.js"></script> <!-- 5. CRUD obstacles, workflow, PDF -->
+  <script src="js/runways.js"></script> <!-- 6. Gestion pistes -->
+  <script src="js/users.js"></script> <!-- 7. Gestion utilisateurs -->
+  <script src="js/surfaces.js"></script> <!-- 8. Surfaces OLS backend → MapLibre -->
+  <script src="js/map.js"></script> <!-- 9. Carte MapLibre, couches, tooltips -->
 </body>
+
 </html>
