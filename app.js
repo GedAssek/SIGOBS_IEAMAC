@@ -6,7 +6,7 @@
    ═══════════════════════════════════════════════════════════ */
 
 /* ── API Backend URL ──────────────────────────────────────── */
-const API_BASE = 'https://pans-ops.skovichvps.cloud-ip.cc/api/v1/';
+const API_BASE = 'https://sigobs.skovichvps.cloud-ip.cc/';
 
 /* ── OurAirports (Redirection si backend hors ligne) ─────────── */
 const OURAIRPORTS = {
@@ -893,6 +893,7 @@ function switchTab(btn, tab) {
   btn.classList.add('active');
   document.getElementById(`tab-${tab}`).classList.add('active');
   if (tab === 'obstacles') renderObstaclesList(App.allObstacles);
+  if (tab === 'aerodromes') loadAllAerodromes();
   if (tab === 'analyse' && GeoMap.map) setTimeout(() => GeoMap.map.resize(), 100);
 }
 
