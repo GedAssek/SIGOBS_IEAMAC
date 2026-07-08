@@ -229,8 +229,6 @@ async function createAndEvaluateObstacle(payload) {
     }
 
     if (!apiObs.creatorId) apiObs.creatorId = App.user?._id || App.user?.id;
-    if (!apiObs.creatorEmail) apiObs.creatorEmail = App.user?.email || '';
-    if (!apiObs.soumisParEmail) apiObs.soumisParEmail = App.user?.email || '';
     App.obstacles.push(apiObs);
     App.allObstacles.push(apiObs);
     if (typeof logAction === 'function') {
@@ -273,13 +271,16 @@ function displayEvalResult(obs, evalData) {
   const surfListEl = document.getElementById('conf-surfaces-list');
   if (!mainEl) return;
 
+  // Le tableau `percements` renvoyé par POST /obstacles/:id/evaluer est
+  // systématiquement vide côté backend (doc §7.8) — la liste des surfaces
+  // réellement percées est donc recalculée côté client (obstacles-geometry.js).
+  const breached = (typeof computeBreachedSurfaces === 'function') ? computeBreachedSurfaces(obs) : [];
+
   if (evalData.perce) {
     mainEl.textContent = 'NON CONFORME';
     mainEl.style.setProperty('color', '#FF1744', 'important');
-    const surfNames = (evalData.percements || [])
-      .map(p => p.surface_type || p.type_surface || p.qfu || '—')
-      .join(', ');
-    subEl.textContent = `${evalData.percements?.length || 0} SURFACE(S) PÉNÉTRÉE(S)${surfNames ? ' — ' + surfNames : ''}`;
+    const surfNames = breached.map(b => b.label).join(', ');
+    subEl.textContent = `${breached.length} SURFACE(S) PÉNÉTRÉE(S)${surfNames ? ' — ' + surfNames : ''}`;
   } else {
     mainEl.textContent = 'CONFORME';
     mainEl.style.setProperty('color', '#00E676', 'important');
@@ -295,24 +296,22 @@ function displayEvalResult(obs, evalData) {
     subEl.textContent = `${evalData.surfaces_testees || evalData.surfaces_testées || 0} SURFACES TESTÉES${geomLine}`;
   }
 
-  renderSurfacesBreachTable(surfListEl, evalData.percements);
+  renderSurfacesBreachTable(surfListEl, obs);
 }
 
-/** Construit le tableau des surfaces percées avec dépassement en mètres */
-function renderSurfacesBreachTable(surfListEl, percements) {
+/** Construit le tableau des surfaces percées avec dépassement en mètres, à partir de computeBreachedSurfaces(obs) */
+function renderSurfacesBreachTable(surfListEl, obs) {
   if (!surfListEl) return;
-  if (percements && percements.length) {
-    surfListEl.innerHTML = percements.map(p => {
-      const limFt = p.altitude_surface != null ? Number(p.altitude_surface) : null;
-      const obsFt = p.altitude_obstacle != null ? Number(p.altitude_obstacle) : null;
-      const depassFt = (limFt != null && obsFt != null) ? (obsFt - limFt) : (p.depassement != null ? Number(p.depassement) : null);
-      const depassM = depassFt != null ? (depassFt * 0.3048) : null;
+  const breached = (typeof computeBreachedSurfaces === 'function' && obs) ? computeBreachedSurfaces(obs) : [];
+  if (breached.length) {
+    surfListEl.innerHTML = breached.map(b => {
+      const obsM = (obs.altitude || 0) * 0.3048;
       return `<div class="conf-surface-row breach">
-        <span class="conf-surf-name">${p.surface_type || p.type_surface || p.qfu || '—'}</span>
-        <span>${p.pente || '—'}</span>
-        <span>${limFt != null ? (limFt * 0.3048).toFixed(1) : '—'} m</span>
-        <span>${obsFt != null ? (obsFt * 0.3048).toFixed(1) : '—'} m</span>
-        <span class="conf-surf-depass">${depassM != null ? '+' + depassM.toFixed(1) + ' m' : '—'}</span>
+        <span class="conf-surf-name">${b.label}</span>
+        <span>—</span>
+        <span>${b.sommetM.toFixed(1)} m</span>
+        <span>${obsM.toFixed(1)} m</span>
+        <span class="conf-surf-depass">−${b.depassementM.toFixed(1)} m</span>
         <span style="color:var(--danger)">✗</span>
       </div>`;
     }).join('');
@@ -341,6 +340,38 @@ async function loadObstaclesList() {
   } catch (e) {
     console.warn('[loadObstaclesList]', e);
     filterObstacles();
+  }
+}
+
+/**
+ * Retrouve le vrai soumetteur de chaque obstacle en croisant GET /evenements
+ * (le modèle Obstacle lui-même ne porte aucun champ créateur — seule la
+ * trace d'audit sait "qui a créé quoi", via utilisateur_id sur l'événement
+ * CREATE). Réservé à l'admin, seul rôle autorisé à voir la colonne
+ * SOUMIS PAR — on évite ainsi un appel réseau inutile pour les autres rôles.
+ */
+async function fetchObstacleCreators() {
+  if (!getIsAdmin()) return;
+  try {
+    const res = await apiFetch('/evenements');
+    const events = res.data || [];
+    const creations = events.filter(ev => ev.type_action === 'CREATE' && ev.collection_impactee === 'Obstacle');
+    // En cas de plusieurs événements CREATE pour un même document_id (rare),
+    // on garde le plus récent.
+    const byObstacleId = {};
+    creations.forEach(ev => {
+      const existing = byObstacleId[ev.document_id];
+      if (!existing || new Date(ev.createdAt) > new Date(existing.createdAt)) {
+        byObstacleId[ev.document_id] = ev;
+      }
+    });
+    App.allObstacles.forEach(obs => {
+      const ev = byObstacleId[obs._id];
+      if (ev?.utilisateur_id?.email) obs.soumisParEmail = ev.utilisateur_id.email;
+    });
+    filterObstacles();
+  } catch (e) {
+    console.warn('[fetchObstacleCreators]', e.message);
   }
 }
 
@@ -406,9 +437,11 @@ function renderObstaclesList(list) {
   const tbody = document.getElementById('obs-list-tbody');
   if (!tbody) return;
 
-  // Colonne 'SOUMIS PAR' visible uniquement pour l'admin en mode "tous"
+
+  // Colonne 'SOUMIS PAR' visible uniquement pour l'admin (indépendamment
+  // du toggle "afficher tous" — règle métier : admin-only, pas admin+toggle)
   const isAdmin = getIsAdmin();
-  const showSoumis = isAdmin && App.showAllObstacles;
+  const showSoumis = isAdmin;
   const soumisColHeader = document.getElementById('obs-col-soumis');
   if (soumisColHeader) soumisColHeader.style.display = showSoumis ? '' : 'none';
 
@@ -631,7 +664,7 @@ function showObstacleConformityDetail(id) {
     }
   }
   if (subEl) subEl.textContent = `OBSTACLE : ${obs.name}${geomLine}`;
-  renderSurfacesBreachTable(surfListEl, obs.percements);
+  renderSurfacesBreachTable(surfListEl, obs);
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -820,14 +853,9 @@ function exportPenetrationsCsv() {
   const rows = [header.join(',')];
 
   penetrating.forEach(obs => {
-    const percements = obs.percements || [];
-    const surfaces = percements.map(p => p.surface_type || p.type_surface || p.qfu || '—').join(' / ');
-    const depassements = percements.map(p => {
-      const lim = p.altitude_surface != null ? Number(p.altitude_surface) : null;
-      const obsAlt = p.altitude_obstacle != null ? Number(p.altitude_obstacle) : null;
-      const dFt = (lim != null && obsAlt != null) ? (obsAlt - lim) : (p.depassement != null ? Number(p.depassement) : null);
-      return dFt != null ? (dFt * 0.3048).toFixed(1) : '—';
-    }).join(' / ');
+    const breached = (typeof computeBreachedSurfaces === 'function') ? computeBreachedSurfaces(obs) : [];
+    const surfaces = breached.map(b => b.label).join(' / ');
+    const depassements = breached.map(b => b.depassementM.toFixed(1)).join(' / ');
     const csvEscape = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     rows.push([
       csvEscape(obs.name), csvEscape(typeToLabel(obs.type)), csvEscape(obs.proprietaire || ''),

@@ -93,6 +93,7 @@ async function submitAerodrome() {
   const ville = (document.getElementById('aero-add-ville')?.value || '').trim();
   const iata = (document.getElementById('aero-add-iata')?.value || '').trim();
   const altitude = parseFloat(document.getElementById('aero-add-altitude')?.value);
+  const magVar = parseFloat(document.getElementById('aero-add-var')?.value);
   const readDms = (prefix, hem) => {
     const deg = parseFloat(document.getElementById(prefix + '-deg')?.value) || 0;
     const min = parseFloat(document.getElementById(prefix + '-min')?.value) || 0;
@@ -106,19 +107,21 @@ async function submitAerodrome() {
     showToast('Code OACI, nom et coordonnées sont requis', 'warn');
     return;
   }
+  if (isNaN(magVar)) {
+    showToast('La variation magnétique est requise', 'warn');
+    return;
+  }
 
   const payload = {
     code_oaci: codeOaci,
     nom,
-    pays: pays || undefined,
     ville: ville || undefined,
-    iata: iata || undefined,
-    // Altitude saisie en mètres dans l'UI → convertie en pieds, convention
-    // déjà utilisée pour l'altitude des obstacles et des seuils de piste.
     altitude: isNaN(altitude) ? undefined : Math.round(altitude * 3.28084 * 100) / 100,
+    var: magVar,
     point_reference: { type: 'Point', coordinates: [lon, lat] },
   };
   Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
+  // Note : `pays` et `iata` ne font pas partie du modèle Aérodrome réel → non envoyés.
 
   try {
     await apiFetch('/aerodromes', 'POST', payload);
@@ -134,7 +137,7 @@ async function submitAerodrome() {
 
 function clearAerodromeForm() {
   ['aero-add-icao', 'aero-add-nom', 'aero-add-pays', 'aero-add-ville',
-    'aero-add-iata', 'aero-add-altitude',
+    'aero-add-iata', 'aero-add-altitude', 'aero-add-var',
     'aero-add-lat-deg', 'aero-add-lat-min', 'aero-add-lat-sec',
     'aero-add-lon-deg', 'aero-add-lon-min', 'aero-add-lon-sec']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });

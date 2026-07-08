@@ -370,9 +370,9 @@
               title="Exporter les obstacles en pénétration (CSV)">
               ↓ PÉNÉTRATIONS (CSV)
             </button>
-            <button class="btn-ghost" onclick="exportSurfacesGeoJSON()"
-              title="Exporter les surfaces OLS pour un autre SIG (GeoJSON)">
-              ↓ SURFACES (GeoJSON)
+            <button class="btn-ghost" onclick="openSuiviModal()"
+              title="Tableau de suivi des obstacles">
+              📋 SUIVI
             </button>
             <button id="btn-toggle-all-obs" class="btn-primary" onclick="toggleAllObstacles()"
               style="display:none; background-color: --btn-color; color:aliceblue">
@@ -467,7 +467,10 @@
                   <label class="field-label">ZONE DE COUVERTURE *</label>
                   <select id="oe-zone-couverture" class="field-select">
                     <option value="1">Zone 1</option>
-                    <option value="2">Zone 2</option>
+                    <option value="2a">Zone 2a</option>
+                    <option value="2b">Zone 2b</option>
+                    <option value="2c">Zone 2c</option>
+                    <option value="2d">Zone 2d</option>
                     <option value="3" selected>Zone 3</option>
                     <option value="4">Zone 4</option>
                   </select>
@@ -908,6 +911,10 @@
               <label class="field-label">ALTITUDE DE RÉFÉRENCE (m)</label>
               <input id="aero-add-altitude" type="number" class="field-input" placeholder="Ex: 218" step="0.1" />
             </div>
+            <div class="field-group">
+              <label class="field-label">VARIATION MAGNÉTIQUE (°) *</label>
+              <input id="aero-add-var" type="number" class="field-input" placeholder="Ex: 1" step="0.1" />
+            </div>
             <div class="coord-section" style="margin-top:10px;">
               <span class="coord-label">POINT DE RÉFÉRENCE</span>
               <div class="dms-group">
@@ -963,20 +970,22 @@
       <div style="display:flex; flex-direction:column; height:100%; padding:16px; gap:12px; overflow-y:auto;">
         <div class="oe-section">
           <div class="oe-section-title">JOURNAL DES ACTIONS — TEMPORALITÉ AIXM 5.2</div>
-          <p style="font-size:12.5px; color:var(--text-secondary); line-height:1.6; margin:0;">
-            Chaque action sur la base est enregistrée avec une classification inspirée du modèle de
-            temporalité AIXM 5.2</p>
           <p style="font-size:11px; color:var(--text-dim); line-height:1.5; margin:6px 0 0;">
-            ⚠️ Journal stocké localement (par navigateur). Voir commentaires de <code>obstacles-archive.js</code>.
+            ℹ️ Source : journal officiel du serveur (<code>GET /evenements</code>), réservé aux rôles
+            Admin et Evaluator. En cas d'indisponibilité ou de rôle insuffisant, un journal local de
+            secours (par navigateur) prend le relais — la source active est indiquée ci-dessous.
           </p>
         </div>
 
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <span class="section-title" style="font-size:14px;">HISTORIQUE — AÉRODROME COURANT</span>
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <span class="section-title" style="font-size:14px;">HISTORIQUE — AÉRODROME COURANT</span>
+            <span id="archive-source-note" style="font-size:11px;"></span>
+          </div>
           <div style="display:flex; gap:8px;">
             <button class="btn-ghost btn-sm" onclick="renderArchiveTab()">ACTUALISER</button>
-            <button class="btn-ghost btn-sm" onclick="clearArchive()" style="color:var(--red);">VIDER LE
-              JOURNAL</button>
+            <button class="btn-ghost btn-sm" onclick="clearArchive()" style="color:var(--red);">VIDER LE JOURNAL
+              LOCAL</button>
           </div>
         </div>
 
@@ -1074,6 +1083,56 @@
     </div>
   </div>
 
+  <!-- ══ MODALE SUIVI OBSTACLES ══ -->
+  <div id="suivi-modal-overlay" class="suivi-modal-overlay hidden" onclick="closeSuiviModalIfOutside(event)">
+    <div class="suivi-modal-box" onclick="event.stopPropagation()">
+      <!-- En-tête de la modale -->
+      <div class="suivi-modal-header">
+        <div class="suivi-modal-title">
+          <span class="suivi-icon">📋</span>
+          <span>TABLEAU DE SUIVI DES OBSTACLES</span>
+          <span id="suivi-aerodrome-label" class="suivi-aerodrome-badge"></span>
+        </div>
+        <div class="suivi-modal-actions">
+          <button class="btn-ghost" onclick="suiviExportCSV()" title="Exporter en CSV">
+            ↓ CSV
+          </button>
+          <button class="btn-ghost" onclick="suiviExportExcel()" title="Exporter en Excel (.xlsx)">
+            ↓ EXCEL
+          </button>
+          <button class="btn-ghost" onclick="suiviSaveAll()" title="Sauvegarder les modifications">
+            💾 SAUVEGARDER
+          </button>
+          <button class="btn-icon-sm" onclick="closeSuiviModal()" title="Fermer" style="font-size:18px; padding:4px 10px;">✕</button>
+        </div>
+      </div>
+
+      <!-- Légende de couleur -->
+      <div class="suivi-legend">
+        <span class="suivi-legend-item"><span class="suivi-dot suivi-dot-auto"></span> Auto-rempli</span>
+        <span class="suivi-legend-item"><span class="suivi-dot suivi-dot-edit"></span> Éditable</span>
+        <span class="suivi-legend-item"><span class="suivi-dot suivi-dot-breach"></span> Pénétration OLS</span>
+      </div>
+
+      <!-- Conteneur du tableau scrollable -->
+      <div class="suivi-table-wrap">
+        <table class="suivi-table" id="suivi-table">
+          <thead id="suivi-thead">
+            <!-- Généré par JS -->
+          </thead>
+          <tbody id="suivi-tbody">
+            <!-- Généré par JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="suivi-modal-footer">
+        <span id="suivi-save-status" class="suivi-save-status"></span>
+        <span>Les données éditables sont sauvegardées localement (localStorage). Cliquez sur 💾 SAUVEGARDER pour persister immédiatement.</span>
+      </div>
+    </div>
+  </div>
+
   <!-- SIGOBS — Modules JS (ordre de chargement obligatoire) -->
   <script src="config.js"></script> <!-- 1. État global, constantes, init DOMContentLoaded -->
   <script src="api.js"></script> <!-- 2. apiFetch, normalisation, helpers, toasts, modal -->
@@ -1085,6 +1144,7 @@
   <script src="obstacles-archive.js"></script> <!-- 6c. Journal d'archive des actions (temporalité AIXM 5.2) -->
   <script src="obstacle-entry-page.js"></script> <!-- 7. Page dédiée de saisie complète d'obstacle -->
   <script src="obstacles-csv-import.js"></script> <!-- 8. Import CSV par lot d'obstacles -->
+  <script src="obstacles-suivi.js"></script> <!-- 8b. Tableau de suivi des obstacles (style tableur) -->
   <script src="runways.js"></script> <!-- 9. Gestion pistes -->
   <script src="users.js"></script> <!-- 10. Gestion utilisateurs -->
   <script src="surfaces.js"></script> <!-- 11. Surfaces OLS backend → MapLibre -->
