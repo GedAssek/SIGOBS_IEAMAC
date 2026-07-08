@@ -6,7 +6,7 @@
    ═══════════════════════════════════════════════════════════ */
 
 /* ── API Backend URL ──────────────────────────────────────── */
-const API_BASE = 'https://pans-ops.skovichvps.cloud-ip.cc/api/v1/';
+const API_BASE = 'https://sigobs.skovichvps.cloud-ip.cc/';
 
 /* ── OurAirports (Redirection si backend hors ligne) ─────────── */
 const OURAIRPORTS = {
@@ -45,9 +45,9 @@ function startClock() {
     const now = new Date();
     const el = document.getElementById('utc-time');
     if (el) el.textContent =
-      `${String(now.getUTCHours()).padStart(2, '0')}:` +
-      `${String(now.getUTCMinutes()).padStart(2, '0')}:` +
-      `${String(now.getUTCSeconds()).padStart(2, '0')}Z`;
+      `${String(now.getHours()).padStart(2, '0')}:` +
+      `${String(now.getMinutes()).padStart(2, '0')}:` +
+      `${String(now.getSeconds()).padStart(2, '0')} UTC`;
   };
   tick(); setInterval(tick, 1000);
 }
@@ -893,6 +893,7 @@ function switchTab(btn, tab) {
   btn.classList.add('active');
   document.getElementById(`tab-${tab}`).classList.add('active');
   if (tab === 'obstacles') renderObstaclesList(App.allObstacles);
+  if (tab === 'aerodromes') loadAllAerodromes();
   if (tab === 'analyse' && GeoMap.map) setTimeout(() => GeoMap.map.resize(), 100);
 }
 
