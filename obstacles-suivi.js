@@ -30,36 +30,25 @@
  * group: optionnel, pour les en-têtes fusionnés (colspan)
  */
 const SUIVI_COLS = [
-  // Colonnes identité — auto
-  { key: 'num',           label: 'N°',                         type: 'auto',  width: 40  },
-  { key: 'nom_projet',    label: 'NOM DU PROJET',              type: 'auto',  width: 140 },
-  // Courrier — éditables
-  { key: 'courrier_asecna', label: 'COURRIER ASECNA',         type: 'edit',  width: 160, group: "N° DU COURRIER D'ÉTUDES D'IMPACT" },
-  { key: 'courrier_aeria',  label: 'COURRIER AERIA',          type: 'edit',  width: 160, group: "N° DU COURRIER D'ÉTUDES D'IMPACT" },
-  // Propriétaire — auto
-  { key: 'proprietaire',  label: "PROPRIÉTAIRE DE L'OUVRAGE", type: 'auto',  width: 140 },
-  // Obstacle — auto
-  { key: 'type_obstacle', label: 'OBSTACLE',                  type: 'auto',  width: 100 },
-  // Localisation — éditable
-  { key: 'localisation',  label: 'LOCALISATION DU SITE',      type: 'edit',  width: 140 },
-  // Coordonnées — auto
-  { key: 'latitude',      label: 'LATITUDE',                  type: 'auto',  width: 110, group: 'COORDONNÉES' },
-  { key: 'longitude',     label: 'LONGITUDE',                 type: 'auto',  width: 110, group: 'COORDONNÉES' },
-  // Altitude / Hauteur — auto
-  { key: 'altitude',      label: 'ALTITUDE',                  type: 'auto',  width: 80  },
-  { key: 'hauteur',       label: 'HAUTEUR',                   type: 'auto',  width: 80  },
-  // Impact — éditable
-  { key: 'impact',        label: "IMPACT DE L'OUVRAGE",       type: 'edit',  width: 200 },
-  // Actions exigées — éditable
-  { key: 'actions_exigees', label: 'ACTIONS EXIGÉES',         type: 'edit',  width: 180 },
-  // État de mise en œuvre — éditables
-  { key: 'etat_actions',    label: 'ACTIONS',                 type: 'edit',  width: 160, group: 'ÉTAT DE MISE EN ŒUVRE' },
-  { key: 'etat_efficacite', label: 'EFFICACITÉ',              type: 'edit',  width: 160, group: 'ÉTAT DE MISE EN ŒUVRE' },
-  // Balisage — éditables
+  // Colonne N° (auto-incrémentée)
+  { key: 'num',           label: 'N°',                            type: 'auto',  width: 40  },
+  // Toutes les autres colonnes sont devenues éditables pour saisie manuelle
+  { key: 'nom_projet',    label: 'NOM DU PROJET',                 type: 'edit',  width: 140 },
+  { key: 'courrier_impact', label: "N° DU COURRIER D'ÉTUDES D'IMPACT", type: 'edit', width: 220 },
+  { key: 'proprietaire',  label: "PROPRIÉTAIRE DE L'OUVRAGE",    type: 'edit',  width: 140 },
+  { key: 'type_obstacle', label: 'OBSTACLE',                     type: 'edit',  width: 100 },
+  { key: 'localisation',  label: 'LOCALISATION DU SITE',         type: 'edit',  width: 140 },
+  { key: 'latitude',      label: 'LATITUDE',                     type: 'edit',  width: 110, group: 'COORDONNÉES' },
+  { key: 'longitude',     label: 'LONGITUDE',                    type: 'edit',  width: 110, group: 'COORDONNÉES' },
+  { key: 'altitude',      label: 'ALTITUDE',                     type: 'edit',  width: 80  },
+  { key: 'hauteur',       label: 'HAUTEUR',                      type: 'edit',  width: 80  },
+  { key: 'impact',        label: "IMPACT DE L'OUVRAGE",          type: 'edit',  width: 200 },
+  { key: 'actions_exigees', label: 'ACTIONS EXIGÉES',            type: 'edit',  width: 180 },
+  { key: 'etat_actions',    label: 'ACTIONS',                    type: 'edit',  width: 160, group: 'ÉTAT DE MISE EN ŒUVRE' },
+  { key: 'etat_efficacite', label: 'EFFICACITÉ',                 type: 'edit',  width: 160, group: 'ÉTAT DE MISE EN ŒUVRE' },
   { key: 'balisage_diurne',   label: 'DIURNE',   type: 'edit', width: 110, group: 'BALISAGES' },
   { key: 'balisage_nocturne', label: 'NOCTURNE', type: 'edit', width: 110, group: 'BALISAGES' },
-  // Observations — éditable
-  { key: 'observations',  label: 'OBSERVATIONS',              type: 'edit',  width: 200 },
+  { key: 'observations',  label: 'OBSERVATIONS',                 type: 'edit',  width: 200 },
 ];
 
 // ── Helpers DMS ──────────────────────────────────────────────────────────────
@@ -75,7 +64,7 @@ function _toDMS(deg, isLat) {
 
 // ── Storage ──────────────────────────────────────────────────────────────────
 function _suiviKey() {
-  return 'sigobs_suivi_' + (App.aerodromeMongoId || 'default');
+  return 'sigobs_suivi_custom_' + (App.aerodromeMongoId || 'default');
 }
 
 function _suiviLoad() {
@@ -88,23 +77,10 @@ function _suiviSave(data) {
   }
 }
 
-// ── Lecture valeur auto depuis obstacle ──────────────────────────────────────
+// ── Lecture valeur auto ──────────────────────────────────────────────────────
 function _autoValue(obs, key, idx) {
-  switch (key) {
-    case 'num':           return idx + 1;
-    case 'nom_projet':    return obs.name || '—';
-    case 'proprietaire':  return obs.proprietaire || '—';
-    case 'type_obstacle': return (typeof typeToLabel === 'function') ? typeToLabel(obs.type) : obs.type;
-    case 'latitude':
-      return obs.latitude != null ? _toDMS(obs.latitude, true) : '—';
-    case 'longitude':
-      return obs.longitude != null ? _toDMS(obs.longitude, false) : '—';
-    case 'altitude':
-      return obs.altitude != null ? (obs.altitude * 0.3048).toFixed(1) + ' m' : '—';
-    case 'hauteur':
-      return (obs.height != null && obs.height !== 0) ? (obs.height * 0.3048).toFixed(1) + ' m' : '—';
-    default: return '—';
-  }
+  if (key === 'num') return idx + 1;
+  return '—';
 }
 
 // ── Construction de l'en-tête (2 lignes) ─────────────────────────────────────
@@ -198,16 +174,21 @@ function openSuiviModal() {
   document.body.style.overflow = 'hidden';
 }
 
+// ── Helpers : 30 lignes vides ────────────────────────────────────────────────
+function _getDummyRows() {
+  return Array.from({ length: 30 }).map((_, i) => ({ _id: 'custom_row_' + i }));
+}
+
 function _renderSuiviTable() {
   const thead = document.getElementById('suivi-thead');
   const tbody = document.getElementById('suivi-tbody');
   if (!thead || !tbody) return;
 
-  const obstacles = App.allObstacles || [];
   const stored = _suiviLoad();
-
   thead.innerHTML = _buildSuiviThead();
-  tbody.innerHTML = _buildSuiviTbody(obstacles, stored);
+  
+  // Générer un tableau vierge de 30 lignes pour saisie libre
+  tbody.innerHTML = _buildSuiviTbody(_getDummyRows(), stored);
 }
 
 // ── Fermeture ─────────────────────────────────────────────────────────────────
@@ -270,14 +251,13 @@ function _suiviShowStatus(msg, color) {
 
 // ── Export CSV ────────────────────────────────────────────────────────────────
 function suiviExportCSV() {
-  const obstacles = App.allObstacles || [];
   const stored = _suiviLoad();
   const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
 
   // En-tête à plat (sans groupes)
   const header = SUIVI_COLS.map(c => esc(c.label)).join(',');
-  const rows = obstacles.map((obs, idx) => {
-    const obsId = obs._id || ('idx_' + idx);
+  const rows = _getDummyRows().map((obs, idx) => {
+    const obsId = obs._id;
     return SUIVI_COLS.map(col => {
       if (col.type === 'auto') return esc(_autoValue(obs, col.key, idx));
       return esc((stored[obsId] && stored[obsId][col.key]) ? stored[obsId][col.key] : '');
@@ -297,7 +277,6 @@ function suiviExportCSV() {
 
 // ── Export Excel (via HTML table → .xls) ─────────────────────────────────────
 function suiviExportExcel() {
-  const obstacles = App.allObstacles || [];
   const stored = _suiviLoad();
   const icao = App.aerodrome?.icao || App.aerodrome?.code_oaci || 'AERO';
   const aeroName = App.aerodrome?.name || App.aerodrome?.nom || '';
@@ -305,22 +284,19 @@ function suiviExportExcel() {
   // Construction du tableau HTML avec en-têtes fusion (pour Excel)
   let theadHtml = _buildSuiviThead();
   let tbodyHtml = '';
-  obstacles.forEach((obs, idx) => {
-    const obsId = obs._id || ('idx_' + idx);
-    const isPenetrating = (typeof checkPenetration === 'function') ? checkPenetration(obs) : false;
-    const rowBg = isPenetrating ? 'background:#ffe0e0;' : '';
+  
+  _getDummyRows().forEach((obs, idx) => {
+    const obsId = obs._id;
     const cells = SUIVI_COLS.map(col => {
-      let val;
       if (col.type === 'auto') {
-        val = String(_autoValue(obs, col.key, idx)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        return `<td style="border:1px solid #bbb;padding:4px 6px;vertical-align:top;">${_autoValue(obs, col.key, idx)}</td>`;
       } else {
-        val = ((stored[obsId] && stored[obsId][col.key]) ? stored[obsId][col.key] : '')
-          .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const savedVal = (stored[obsId] && stored[obsId][col.key]) ? stored[obsId][col.key] : '';
+        const escaped = savedVal.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        return `<td style="border:1px solid #bbb;padding:4px 6px;vertical-align:top;background:#ffffff;">${escaped}</td>`;
       }
-      const bg = col.type === 'edit' ? 'background:#f0f7ff;' : 'background:#f9f9f9;';
-      return `<td style="border:1px solid #bbb;padding:4px 6px;vertical-align:top;${bg}">${val}</td>`;
     }).join('');
-    tbodyHtml += `<tr style="${rowBg}">${cells}</tr>`;
+    tbodyHtml += `<tr>${cells}</tr>`;
   });
 
   const html = `

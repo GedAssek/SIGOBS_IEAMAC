@@ -413,26 +413,30 @@ async function reconcileObstacleVerdicts() {
   updateConformityPanel();
 }
 
-/** Fonction utilitaire pour évaluer la pénétration si le backend ne l'envoie pas explicitement */
+/**
+ * Évalue si un obstacle pénètre une surface OLS.
+ *
+ * Priorité au calcul géométrique client (Turf.js, point-in-polygon) quand
+ * les surfaces OLS sont chargées — ce calcul est cohérent avec le panneau
+ * de détail (dégagement, tableau des surfaces percées) et plus fiable que
+ * le champ `perce` du backend qui peut être obsolète ou mal calculé.
+ *
+ * Fallback sur obs.perce (verdict backend) uniquement si la géométrie
+ * n'est pas encore disponible (surfaces non chargées, Turf.js absent,
+ * coordonnées manquantes).
+ */
 function checkPenetration(obs) {
-  if (obs.perce !== undefined && obs.perce !== null) return obs.perce;
-  const altM = (obs.altitude || 0) * 0.3048;
-  let breach = false;
-  if (window.GeoMap && GeoMap.map) {
-    try {
-      const src = GeoMap.map.getSource('src-backend-surfaces');
-      if (src && src._data && src._data.features) {
-        for (const f of src._data.features) {
-          const surfCeil = f.properties?.heightM || 0;
-          if (surfCeil > 0 && altM > surfCeil) {
-            breach = true;
-            break;
-          }
-        }
-      }
-    } catch (_) { }
+  // ── Calcul géométrique client (prioritaire) ──────────────────────────────
+  if (typeof computeBreachedSurfaces === 'function' &&
+      typeof turf !== 'undefined' &&
+      typeof GeoMap !== 'undefined' && GeoMap.surfacesGeoJSON?.features?.length > 0 &&
+      obs.latitude != null && obs.longitude != null) {
+    return computeBreachedSurfaces(obs).length > 0;
   }
-  return breach;
+  // ── Fallback : verdict backend ────────────────────────────────────────────
+  if (obs.perce !== undefined && obs.perce !== null) return obs.perce;
+  // ── Aucune donnée disponible : CONFORME par défaut ───────────────────────
+  return false;
 }
 
 /** Génère le HTML du tableau des obstacles et met à jour le panneau de conformité */
