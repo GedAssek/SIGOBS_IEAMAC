@@ -6,7 +6,7 @@
    ═══════════════════════════════════════════════════════════ */
 
 /* ── API Backend URL ──────────────────────────────────────── */
-const API_BASE = 'https://pans-ops.skovichvps.cloud-ip.cc/api/v1/';
+const API_BASE = 'https://sigobs.skovichvps.cloud-ip.cc/';
 
 /* ── OurAirports (Redirection si backend hors ligne) ─────────── */
 const OURAIRPORTS = {
@@ -45,9 +45,9 @@ function startClock() {
     const now = new Date();
     const el = document.getElementById('utc-time');
     if (el) el.textContent =
-      `${String(now.getUTCHours()).padStart(2, '0')}:` +
-      `${String(now.getUTCMinutes()).padStart(2, '0')}:` +
-      `${String(now.getUTCSeconds()).padStart(2, '0')}Z`;
+      `${String(now.getHours()).padStart(2, '0')}:` +
+      `${String(now.getMinutes()).padStart(2, '0')}:` +
+      `${String(now.getSeconds()).padStart(2, '0')} UTC`;
   };
   tick(); setInterval(tick, 1000);
 }
@@ -893,6 +893,7 @@ function switchTab(btn, tab) {
   btn.classList.add('active');
   document.getElementById(`tab-${tab}`).classList.add('active');
   if (tab === 'obstacles') renderObstaclesList(App.allObstacles);
+  if (tab === 'aerodromes') loadAllAerodromes();
   if (tab === 'analyse' && GeoMap.map) setTimeout(() => GeoMap.map.resize(), 100);
 }
 
@@ -1416,8 +1417,8 @@ async function generatePdfReport() {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const rwy = App.activeRunway, now = new Date();
 
-  const CYAN = [0, 229, 255], GREEN = [0, 230, 118], RED = [255, 23, 68], AMBER = [255, 179, 0];
-  const BG = [5, 10, 18], DARK = [8, 14, 26], PANEL = [11, 18, 32], TEXT = [208, 232, 245], DIM = [51, 77, 99];
+  const CYAN = [14, 165, 233], GREEN = [34, 197, 94], RED = [239, 68, 68], AMBER = [245, 158, 11];
+  const BG = [255, 255, 255], DARK = [248, 250, 252], PANEL = [241, 245, 249], TEXT = [15, 23, 42], DIM = [100, 116, 139];
 
   doc.setFillColor(...BG); doc.rect(0, 0, 210, 297, 'F');
   doc.setFillColor(...DARK); doc.rect(0, 0, 210, 28, 'F');
@@ -1432,8 +1433,8 @@ async function generatePdfReport() {
   doc.text('Moteur : V5.0_MAP2026', 210, 22, { align: 'right' });
 
   let y = 36;
-  const section = (n, title) => { doc.setFillColor(...PANEL); doc.rect(10, y, 190, 6, 'F'); doc.setTextColor(...CYAN); doc.setFont('courier', 'bold'); doc.setFontSize(8); doc.text(`${n}. ${title}`, 14, y + 4.2); y += 8; };
-  const kv = (k, v, k2, v2) => { doc.setFontSize(7.5); doc.setFont('courier', 'bold'); doc.setTextColor(...DIM); doc.text(k, 14, y + 4); doc.setTextColor(...TEXT); doc.setFont('courier', 'normal'); doc.text(String(v), 50, y + 4); if (k2) { doc.setFont('courier', 'bold'); doc.setTextColor(...DIM); doc.text(k2, 110, y + 4); doc.setTextColor(...TEXT); doc.setFont('courier', 'normal'); doc.text(String(v2), 146, y + 4); } y += 7; };
+  const section = (n, title) => { doc.setFillColor(...PANEL); doc.rect(10, y, 190, 8, 'F'); doc.setTextColor(...CYAN); doc.setFont('courier', 'bold'); doc.setFontSize(11); doc.text(`${n}. ${title}`, 14, y + 5.5); y += 10; };
+  const kv = (k, v, k2, v2) => { doc.setFontSize(10); doc.setFont('courier', 'bold'); doc.setTextColor(...DIM); doc.text(k, 14, y + 6); doc.setTextColor(...TEXT); doc.setFont('courier', 'normal'); doc.text(String(v), 50, y + 6); if (k2) { doc.setFont('courier', 'bold'); doc.setTextColor(...DIM); doc.text(k2, 110, y + 6); doc.setTextColor(...TEXT); doc.setFont('courier', 'normal'); doc.text(String(v2), 146, y + 6); } y += 9; };
 
   section('1', 'INFORMATIONS AÉRODROME');
   kv('OACI', App.aerodrome?.icao || '—', 'NOM', App.aerodrome?.name || '—');
@@ -1454,42 +1455,42 @@ async function generatePdfReport() {
     ['Conique', '1:20 (5%)', `${(rwyElev + mToFt(OLS.ihs.height + OLS.conical.height)).toFixed(0)} ft`, `${OLS.ihs.radius}–${(OLS.ihs.radius + OLS.conical.height / OLS.conical.slope).toFixed(0)} m`],
     ['TOCS', '1:50 (2%)', `${(rwyElev + mToFt(OLS.takeoff.length * OLS.takeoff.slope)).toFixed(0)} ft`, `${OLS.takeoff.innerWidth}–${(OLS.takeoff.innerWidth + 2 * OLS.takeoff.length * OLS.takeoff.divergence).toFixed(0)} m`],
   ];
-  doc.setFillColor(15, 25, 40); doc.rect(10, y, 190, 7, 'F');
-  doc.setFontSize(7); doc.setFont('courier', 'bold'); doc.setTextColor(...DIM);
-  ['SURFACE', 'PENTE', 'LIM. ALTITUDE', 'EMPRISE LATÉRALE'].forEach((h, i) => doc.text(h, 14 + [0, 50, 95, 145][i], y + 4.5)); y += 7;
-  const surfColors = [[0, 229, 255], [206, 147, 216], [105, 240, 174], [255, 213, 79], [255, 145, 0]];
+  doc.setFillColor(...PANEL); doc.rect(10, y, 190, 8, 'F');
+  doc.setFontSize(9); doc.setFont('courier', 'bold'); doc.setTextColor(...TEXT);
+  ['SURFACE', 'PENTE', 'LIM. ALTITUDE', 'EMPRISE LATÉRALE'].forEach((h, i) => doc.text(h, 14 + [0, 50, 95, 145][i], y + 5)); y += 8;
+  const surfColors = [[14, 165, 233], [206, 147, 216], [34, 197, 94], [250, 204, 21], [249, 115, 22]];
   olsRows.forEach((row, ri) => {
-    doc.setFillColor(ri % 2 === 0 ? 11 : 8, ri % 2 === 0 ? 18 : 14, ri % 2 === 0 ? 32 : 26); doc.rect(10, y, 190, 6.5, 'F');
-    const sc = surfColors[ri] || TEXT; doc.setTextColor(...sc); doc.setFont('courier', 'bold'); doc.setFontSize(7.5); doc.text(row[0], 14, y + 4.2);
-    doc.setTextColor(...TEXT); doc.setFont('courier', 'normal'); doc.text(row[1], 64, y + 4.2); doc.text(row[2], 109, y + 4.2); doc.text(row[3], 159, y + 4.2); y += 6.5;
+    doc.setFillColor(...(ri % 2 === 0 ? BG : DARK)); doc.rect(10, y, 190, 8, 'F');
+    const sc = surfColors[ri] || TEXT; doc.setTextColor(...sc); doc.setFont('courier', 'bold'); doc.setFontSize(9); doc.text(row[0], 14, y + 5.5);
+    doc.setTextColor(...TEXT); doc.setFont('courier', 'normal'); doc.text(row[1], 64, y + 5.5); doc.text(row[2], 109, y + 5.5); doc.text(row[3], 159, y + 5.5); y += 8;
   });
 
   y += 4; section('4', `ANALYSE DES OBSTACLES  (${App.obstacles.length} obstacle(s))`);
   let totalBreaches = 0;
   if (!App.obstacles.length) {
-    doc.setTextColor(...DIM); doc.setFont('courier', 'normal'); doc.setFontSize(8);
-    doc.text('Aucun obstacle enregistré pour cet aérodrome.', 14, y + 4); y += 10;
+    doc.setTextColor(...DIM); doc.setFont('courier', 'normal'); doc.setFontSize(10);
+    doc.text('Aucun obstacle enregistré pour cet aérodrome.', 14, y + 6); y += 10;
   } else {
-    doc.setFillColor(15, 25, 40); doc.rect(10, y, 190, 7, 'F');
-    doc.setFontSize(6.5); doc.setFont('courier', 'bold'); doc.setTextColor(...DIM);
-    ['DÉSIGNATION', 'TYPE', 'ALT (ft)', 'LIM. OLS (ft)', 'ÉCART (ft)', 'SURFACE', 'VERDICT'].forEach((h, i) => doc.text(h, 14 + [0, 50, 80, 100, 122, 145, 168][i], y + 4.5)); y += 7;
+    doc.setFillColor(...PANEL); doc.rect(10, y, 190, 8, 'F');
+    doc.setFontSize(8); doc.setFont('courier', 'bold'); doc.setTextColor(...TEXT);
+    ['DÉSIGNATION', 'TYPE', 'ALT (ft)', 'LIM. OLS (ft)', 'ÉCART (ft)', 'SURFACE', 'VERDICT'].forEach((h, i) => doc.text(h, 14 + [0, 50, 80, 100, 122, 145, 168][i], y + 5)); y += 8;
     App.obstacles.forEach((obs, ri) => {
       const result = getOLSLimit(obs.latitude, obs.longitude, rwy);
       const olsLimit = result ? result.limit : null, breach = olsLimit !== null && obs.altitude > olsLimit;
       const clearance = olsLimit != null ? (olsLimit - obs.altitude) : null;
       if (breach) totalBreaches++;
-      doc.setFillColor(breach ? 30 : (ri % 2 === 0 ? 11 : 8), breach ? 5 : (ri % 2 === 0 ? 18 : 14), breach ? 8 : (ri % 2 === 0 ? 32 : 26)); doc.rect(10, y, 190, 6.5, 'F');
-      if (breach) { doc.setDrawColor(...RED); doc.setLineWidth(0.5); doc.line(10, y, 10, y + 6.5); }
-      doc.setFontSize(7); doc.setFont('courier', 'bold'); doc.setTextColor(...TEXT); doc.text((obs.name || '—').slice(0, 18), 14, y + 4.2);
-      doc.setFont('courier', 'normal'); doc.setTextColor(...DIM); doc.text(typeToLabel(obs.type).slice(0, 12), 64, y + 4.2);
-      doc.setTextColor(...TEXT); doc.text(String(obs.altitude ?? '—'), 94, y + 4.2); doc.text(olsLimit != null ? olsLimit.toFixed(0) : '—', 114, y + 4.2);
+      doc.setFillColor(...(breach ? [254, 226, 226] : (ri % 2 === 0 ? BG : DARK))); doc.rect(10, y, 190, 8, 'F');
+      if (breach) { doc.setDrawColor(...RED); doc.setLineWidth(0.5); doc.line(10, y, 10, y + 8); }
+      doc.setFontSize(8); doc.setFont('courier', 'bold'); doc.setTextColor(...TEXT); doc.text((obs.name || '—').slice(0, 18), 14, y + 5.5);
+      doc.setFont('courier', 'normal'); doc.setTextColor(...DIM); doc.text(typeToLabel(obs.type).slice(0, 12), 64, y + 5.5);
+      doc.setTextColor(...TEXT); doc.text(String(obs.altitude ?? '—'), 94, y + 5.5); doc.text(olsLimit != null ? olsLimit.toFixed(0) : '—', 114, y + 5.5);
       const cl = clearance != null ? clearance.toFixed(0) : '—';
       const clColor = clearance == null ? DIM : clearance < 0 ? RED : clearance < 30 ? AMBER : GREEN;
-      doc.setTextColor(...clColor); doc.text((clearance != null && clearance < 0 ? '+' : '') + cl, 136, y + 4.2);
-      doc.setTextColor(...DIM); doc.text(result ? result.surface.slice(0, 12) : '—', 159, y + 4.2);
+      doc.setTextColor(...clColor); doc.text((clearance != null && clearance < 0 ? '+' : '') + cl, 136, y + 5.5);
+      doc.setTextColor(...DIM); doc.text(result ? result.surface.slice(0, 12) : '—', 159, y + 5.5);
       doc.setTextColor(...(breach ? RED : GREEN)); doc.setFont('courier', 'bold');
-      doc.text(olsLimit == null ? 'HORS ZONE' : breach ? 'PENETRATION' : 'CONFORME', 182, y + 4.2);
-      y += 6.5; if (y > 270) { doc.addPage(); doc.setFillColor(...BG); doc.rect(0, 0, 210, 297, 'F'); y = 15; }
+      doc.text(olsLimit == null ? 'HORS ZONE' : breach ? 'PENETRATION' : 'CONFORME', 182, y + 5.5);
+      y += 8; if (y > 270) { doc.addPage(); doc.setFillColor(...BG); doc.rect(0, 0, 210, 297, 'F'); y = 15; }
     });
     y += 4;
     const conformes = App.obstacles.length - totalBreaches;
