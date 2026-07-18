@@ -180,28 +180,13 @@ function renderAerodromesAdminList() {
         ${!isCurrent ? `<button class="action-btn" onclick="switchAerodrome('${id}')">SÉLECTIONNER</button>` : ''}
         <button class="action-btn" onclick="openEditAerodromeModal('${id}')">ÉDITER</button>
         ${isAdmin ? `<button class="action-btn" onclick="openGrantAccessModal('${id}','${(a.code_oaci || a.icao || '').replace(/'/g, "\\'")}')">GÉRER LES ACCÈS</button>` : ''}
-        ${isAdmin ? `<button class="action-btn delete" onclick="confirmDeleteAerodrome('${id}','${(a.code_oaci || a.icao || '').replace(/'/g, "\\'")}')">✕</button>` : ''}
       </div>
     </div>`;
   }).join('');
 }
 
 function confirmDeleteAerodrome(id, icao) {
-  showModal(
-    "Supprimer l'aérodrome",
-    `Confirmer la suppression de <strong>${icao}</strong> ?<br>
-     <small style="color:var(--dim)">Pistes, surfaces et obstacles associés seront également affectés.</small>`,
-    async () => {
-      try {
-        await apiFetch(`/aerodromes/${id}`, 'DELETE');
-        if (typeof logAction === 'function') logAction('suppression', 'aerodrome', icao, '', 'PERMDELTA');
-        showToast(`Aérodrome ${icao} supprimé`, 'success');
-        await loadAllAerodromes();
-      } catch (e) {
-        showToast('Erreur : ' + e.message, 'error');
-      }
-    }
-  );
+  showToast("La suppression d'un aérodrome n'est pas supportée par l'API.", 'warn');
 }
 
 function openEditAerodromeModal(id) {
@@ -421,17 +406,9 @@ async function openGrantAccessModal(aerodromeId, icao) {
       if (!selectEl) return;
       const userId = selectEl.value;
       if (!userId) return;
-      
-      // Trouver l'utilisateur pour récupérer ses accès existants
-      const user = usersWithoutAccess.find(u => u._id === userId);
-      let newAutorises = Array.isArray(user?.aerodromes_autorises) ? [...user.aerodromes_autorises] : [];
-      if (!newAutorises.includes(aerodromeId)) newAutorises.push(aerodromeId);
 
       try {
-        await apiFetch(`/utilisateurs/${userId}`, 'PATCH', {
-          aerodrome_id: aerodromeId, // Optionnel, mais on maintient la logique de base
-          aerodromes: newAutorises,
-        });
+        await apiFetch(`/aerodromes/${aerodromeId}/user/${userId}`, 'POST');
         showToast('Accès accordé', 'success');
         if (typeof loadUsers === 'function') loadUsers();
       } catch (e) {
@@ -455,22 +432,7 @@ window.revokeAerodromeAccess = async function(userId, aerodromeId, icao) {
   if (!confirm(`Voulez-vous vraiment retirer l'accès de cet utilisateur à l'aérodrome ${icao} ?`)) return;
   
   try {
-    const res = await apiFetch('/utilisateurs');
-    const users = res.data || [];
-    const user = users.find(u => u._id === userId);
-    
-    if (!user) throw new Error("Utilisateur introuvable");
-    
-    let newAutorises = Array.isArray(user.aerodromes_autorises) ? user.aerodromes_autorises.filter(id => id !== aerodromeId) : [];
-    
-    // Si l'aérodrome retiré était son aérodrome principal, on le nullifie ou on prend un autre
-    let patchData = { aerodromes: newAutorises };
-    const currentMainId = typeof user.aerodrome_id === 'object' ? user.aerodrome_id?._id : user.aerodrome_id;
-    if (currentMainId === aerodromeId) {
-      patchData.aerodrome_id = newAutorises.length > 0 ? newAutorises[0] : null;
-    }
-    
-    await apiFetch(`/utilisateurs/${userId}`, 'PATCH', patchData);
+    await apiFetch(`/aerodromes/${aerodromeId}/user/${userId}`, 'DELETE');
     showToast(`Accès retiré`, 'success');
     
     // Rafraîchir la modale d'accès

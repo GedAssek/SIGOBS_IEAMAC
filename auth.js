@@ -36,8 +36,8 @@ async function handleLogin() {
       sessionStorage.setItem('sigobs_token', App.token);
       sessionStorage.setItem('sigobs_user',  JSON.stringify(App.user));
       
-      if (email === password) {
-        // Première connexion (le mot de passe est l'email)
+      if (userData.mustChangePassword || email === password || password === 'password123') {
+        // Première connexion (le mot de passe est l'email ou le mot de passe par défaut)
         App.forcePasswordChange = true;
         document.getElementById('screen-login').classList.remove('active');
         openChangePasswordModal();

@@ -157,7 +157,6 @@ function renderRunwaysManagementList() {
         <span class="tag tag-info">OACI ${rwy.icaoCode || '—'}</span>
         ${rwy.typesApproche?.length ? `<span class="tag tag-pass">${rwy.typesApproche.join(', ')}</span>` : ''}
         ${rwy._id ? `<button class="action-btn" onclick="openEditRunwayModal('${rwy._id}')">ÉDITER</button>` : ''}
-        ${rwy._id && isAdmin ? `<button class="action-btn delete" onclick="confirmDeleteRunway('${rwy._id}','${rwy.designation}')">✕</button>` : ''}
       </div>
     </div>
   `).join('');
@@ -485,19 +484,5 @@ function clearRunwayForm() {
 
 /** Confirmation de suppression d'une piste (si l'API le supporte) */
 function confirmDeleteRunway(id, designation) {
-  showModal(
-    'Supprimer la piste',
-    `Confirmer la suppression de <strong>RWY ${designation}</strong> ?<br>
-     <small style="color:var(--dim)">Les surfaces OLS associées seront recalculées.</small>`,
-    async () => {
-      try {
-        await apiFetch(`/pistes/${id}`, 'DELETE');
-        showToast(`Piste ${designation} supprimée`, 'success');
-        await loadStudyAerodrome();
-        renderRunwaysManagementList();
-      } catch (e) {
-        showToast('Erreur : ' + e.message, 'error');
-      }
-    }
-  );
+  showToast("La suppression d'une piste n'est pas supportée par l'API.", 'warn');
 }
