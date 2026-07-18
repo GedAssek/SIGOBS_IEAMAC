@@ -230,10 +230,17 @@ function computeAdmissibleAltitude(lat, lon, obs) {
       } else if ((type === 'transition' || type === 'transition_gauche' || type === 'transition_droite') && obs) {
         const distBande = getClosestRunwayStripDist(lat, lon);
         if (distBande != null) {
-          let inner = (distBande * distBande) - Math.pow(altobsM - hobsM - altAdRefM, 2);
-          if (inner < 0) inner = 0;
-          const dTrans = Math.sqrt(inner);
-          sommetM = altAdRefM + 0.143 * dTrans;
+          // Formule correcte : AltAdm = Alt_aérodrome + 45 - (pente × d)
+          // d = min(distancePoint_vers_limite_sup, limiteSup)
+          // La limite supérieure est la projection horizontale du bord supérieur
+          // de la surface de transition sur l'horizontale où elle s'appuie.
+          // limiteSup = 45 / pente = 45 / (1/7) ≈ 315 m depuis le bord de la bande
+          const pente = 1 / 7; // ≈ 0.14286
+          const limiteSup = 45 / pente; // ≈ 315 m
+          // d = distance horizontale de l'obstacle vers la limite supérieure
+          const distToUpperLimit = Math.max(0, limiteSup - distBande);
+          const d = Math.min(distToUpperLimit, limiteSup);
+          sommetM = altAdRefM + 45 - (pente * d);
         }
         dynamicTypesSeen.add(type);
       }
