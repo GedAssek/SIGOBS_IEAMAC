@@ -69,6 +69,7 @@ async function loadUsers() {
   if (tbody) tbody.innerHTML = '<tr class="table-placeholder"><td colspan="4">Chargement…</td></tr>';
   try {
     if (!_cachedRoles.length) await loadRoles();
+    populateUserAerodromes(); // Remplir la liste d'aérodromes pour la création
     const res   = await apiFetch('/utilisateurs');
     const users = res.data || [];
     renderUsersList(users);
@@ -105,7 +106,6 @@ function renderUsersList(users) {
       <td>${aeroLabel}</td>
       <td>
         <div class="action-group">
-          <button class="action-btn" onclick="openReassignAerodromeModal('${u._id}','${emailSafe}')">AÉRODROME</button>
           <button class="action-btn delete" onclick="confirmDeleteUser('${u._id}','${emailSafe}')">✕</button>
         </div>
       </td>
@@ -113,69 +113,110 @@ function renderUsersList(users) {
   }).join('');
 }
 
-/**
- * Ouvre une modale permettant à l'admin de changer l'aérodrome associé à
- * un utilisateur — c'est le mécanisme par lequel un utilisateur non-admin
- * obtient l'accès à un aérodrome ajouté par l'admin pour ses évaluations.
+/** 
+ * Peuple la liste des cases à cocher pour le choix d'aérodromes lors de la création d'utilisateur
  */
-async function openReassignAerodromeModal(userId, email) {
+async function populateUserAerodromes() {
+  const container = document.getElementById('user-aero-checkboxes');
+  if (!container) return;
+  
   if (!App.aerodromesList || !App.aerodromesList.length) {
+    container.innerHTML = '<div class="empty-msg" style="font-size:11px;">Chargement...</div>';
     try {
       const res = await apiFetch('/aerodromes');
       App.aerodromesList = res.data || [];
     } catch (e) {
-      showToast("Impossible de charger la liste des aérodromes", 'error');
+      container.innerHTML = '<div class="empty-msg" style="font-size:11px; color:var(--danger);">Erreur chargement</div>';
       return;
     }
   }
-  const options = App.aerodromesList.map(a =>
-    `<option value="${a._id}">${a.code_oaci || a.icao} — ${a.nom || a.name || ''}</option>`
-  ).join('');
 
-  showModal(
-    `Aérodrome de ${email}`,
-    `<p style="margin-bottom:10px;">Choisissez l'aérodrome auquel cet utilisateur aura accès pour ses évaluations :</p>
-     <select id="reassign-aero-select" class="field-select" style="width:100%;">${options}</select>`,
-    async () => {
-      const aerodromeId = document.getElementById('reassign-aero-select')?.value;
-      if (!aerodromeId) return;
-      try {
-        await apiFetch(`/utilisateurs/${userId}`, 'PATCH', {
-          aerodrome_id: aerodromeId,
-          aerodromes_autorises: [aerodromeId],
-        });
-        showToast('Aérodrome mis à jour', 'success');
-        await loadUsers();
-      } catch (e) {
-        showToast('Erreur : ' + e.message, 'error');
-      }
-    }
-  );
-}
-
-/* ══════════════════════════════════════════════════════════
-   CRÉER UN UTILISATEUR — POST /utilisateurs (doc §9.3)
-   Le mot de passe est hashé automatiquement côté backend (bcrypt).
-   Le champ password ne revient jamais dans les réponses.
-══════════════════════════════════════════════════════════ */
-async function createUser() {
-  const email      = (document.getElementById('user-email')?.value   || '').trim();
-  const password   =  document.getElementById('user-password')?.value || '';
-  const roleId     =  document.getElementById('user-role-select')?.value || '';
-  // Scope optionnel : associer l'utilisateur à l'aérodrome d'étude courant
-  const aerodromeId = App.aerodromeMongoId || '';
-
-  if (!email || !password || !roleId) {
-    showToast('Email, mot de passe et rôle sont requis', 'warn');
+  if (!App.aerodromesList.length) {
+    container.innerHTML = '<div class="empty-msg" style="font-size:11px;">Aucun aérodrome</div>';
     return;
   }
 
+  container.innerHTML = App.aerodromesList.map(a => `
+    <label class="toggle-label user-aero-item" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+      <input type="checkbox" value="${a._id}" data-icao="${a.code_oaci || a.icao || ''}" data-name="${a.nom || a.name || ''}" />
+      <span style="font-size:12px;"><strong>${a.code_oaci || a.icao || '—'}</strong> ${a.nom || a.name || ''}</span>
+    </label>
+  `).join('');
+}
+
+/** 
+ * Filtre la liste des aérodromes dans le formulaire de création d'utilisateur
+ */
+function filterUserAerodromes() {
+  const input = document.getElementById('user-aero-search');
+  if (!input) return;
+  const filter = input.value.toLowerCase();
+  const items = document.querySelectorAll('.user-aero-item');
+  items.forEach(item => {
+    const text = item.textContent.toLowerCase();
+    item.style.display = text.includes(filter) ? 'flex' : 'none';
+  });
+}
+
+/**
+ * Affiche le résumé avant de confirmer la création
+ */
+function reviewUserCreation() {
+  const email      = (document.getElementById('user-email')?.value   || '').trim();
+  const password   = email; // Le mot de passe par défaut est l'email
+  const roleSelect =  document.getElementById('user-role-select');
+  const roleId     =  roleSelect?.value || '';
+  const roleName   =  roleSelect?.options[roleSelect.selectedIndex]?.text || '';
+  
+  if (!email || !roleId) {
+    showToast('Email et rôle sont requis', 'warn');
+    return;
+  }
+
+  // Récupérer les aérodromes sélectionnés
+  const checkedBoxes = Array.from(document.querySelectorAll('#user-aero-checkboxes input[type="checkbox"]:checked'));
+  const selectedAeros = checkedBoxes.map(cb => ({
+    id: cb.value,
+    icao: cb.getAttribute('data-icao'),
+    name: cb.getAttribute('data-name')
+  }));
+
+  let aeroHtml = '<div style="margin-top:10px; padding:10px; background:rgba(0,0,0,0.05); border-radius:4px;">';
+  aeroHtml += '<strong>Aérodromes associés :</strong><ul style="margin:5px 0 0 20px; font-size:13px; color:var(--text-secondary);">';
+  if (selectedAeros.length > 0) {
+    selectedAeros.forEach(a => aeroHtml += `<li>${a.icao} - ${a.name}</li>`);
+  } else {
+    aeroHtml += '<li><em>Aucun aérodrome sélectionné</em></li>';
+  }
+  aeroHtml += '</ul></div>';
+
+  const bodyHtml = `
+    <p>Veuillez vérifier les informations suivantes avant la création de l'utilisateur :</p>
+    <div style="margin-top:15px; font-size:14px;">
+      <p><strong>Email :</strong> ${email}</p>
+      <p><strong>Mot de passe :</strong> <em>Identique à l'email (à changer à la première connexion)</em></p>
+      <p><strong>Rôle :</strong> ${roleName}</p>
+      ${aeroHtml}
+    </div>
+  `;
+
+  showModal('Résumé de création', bodyHtml, () => {
+    confirmCreateUser(email, password, roleId, selectedAeros.map(a => a.id));
+  });
+}
+
+/** Crée l'utilisateur en envoyant les données au serveur */
+async function confirmCreateUser(email, password, roleId, aerodromeIds) {
   const payload = {
     email,
     password,
     role_id: roleId,
-    ...(aerodromeId ? { aerodrome_id: aerodromeId } : {}),
   };
+  
+  // Envoyer le tableau des aérodromes associés
+  if (aerodromeIds.length > 0) {
+    payload.aerodromes = aerodromeIds;
+  }
 
   try {
     await apiFetch('/utilisateurs', 'POST', payload);
@@ -184,18 +225,23 @@ async function createUser() {
     await loadUsers();
   } catch (e) {
     showToast('Erreur : ' + e.message, 'error');
-    console.error('[createUser]', e);
+    console.error('[confirmCreateUser]', e);
   }
 }
 
 /** Réinitialise le formulaire de création d'utilisateur */
 function clearUserForm() {
-  ['user-email', 'user-password'].forEach(id => {
+  ['user-email', 'user-password', 'user-aero-search'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
   const sel = document.getElementById('user-role-select');
   if (sel) sel.value = '';
+  
+  // Décocher les aérodromes et réinitialiser le filtre
+  const checkboxes = document.querySelectorAll('#user-aero-checkboxes input[type="checkbox"]');
+  checkboxes.forEach(cb => cb.checked = false);
+  filterUserAerodromes(); // Rétablir l'affichage de tous les items
 }
 
 /* ══════════════════════════════════════════════════════════

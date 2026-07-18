@@ -14,22 +14,6 @@
                statusLabel, showToast, showModal)
    ═══════════════════════════════════════════════════════════ */
 
-/**
- * Helper global : résout le rôle de l'utilisateur connecté quelle que soit
- * la forme retournée par l'API (string ou objet { _id, nomRole }).
- * @returns {boolean} true si l'utilisateur est admin
- */
-function getIsAdmin() {
-  const roleRaw = App.user?.role;
-  let roleName;
-  if (typeof roleRaw === 'object' && roleRaw !== null) {
-    roleName = roleRaw.nomRole || roleRaw.name || '';
-  } else {
-    roleName = String(roleRaw || '');
-  }
-  // Utiliser aussi _roleName stocké par auth.js si disponible
-  return (App.user?._roleName || roleName).toLowerCase() === 'admin';
-}
 
 /* ══════════════════════════════════════════════════════════
    COORDONNÉES — Gestion DMS / DD
@@ -251,17 +235,25 @@ async function createAndEvaluateObstacle(payload) {
     // Conserver les attributs étendus localement (le backend peut ne pas les renvoyer)
     apiObs.extended = extractExtendedAttributes(payload);
 
-    // 2. Évaluation OLS — réponse: { success, data: { perce, statut_resultant, percements, surfaces_testees } }
-    try {
-      const evalRes = await apiFetch('/obstacles/' + apiObs._id + '/evaluer', 'POST');
-      const evalData = evalRes.data || {};
-      if (evalData.statut_resultant) apiObs.status = normalizeStatusBack(evalData.statut_resultant);
-      if (evalData.perce !== undefined) apiObs.perce = evalData.perce;
-      if (evalData.percements) apiObs.percements = evalData.percements;
-      displayEvalResult(apiObs, evalData);
-    } catch (e) {
-      console.warn('[createAndEvaluateObstacle] Erreur évaluation:', e.message);
-      showToast('Obstacle sauvegardé — évaluation OLS non disponible', 'warn');
+    // 2. Évaluation OLS — réservé Admin et Evaluator
+    const isAdmin = typeof getIsAdmin === 'function' ? getIsAdmin() : false;
+    const isEvaluator = typeof getIsEvaluator === 'function' ? getIsEvaluator() : false;
+    
+    if (isAdmin || isEvaluator) {
+      try {
+        const evalRes = await apiFetch('/obstacles/' + apiObs._id + '/evaluer', 'POST');
+        const evalData = evalRes.data || {};
+        if (evalData.statut_resultant) apiObs.status = normalizeStatusBack(evalData.statut_resultant);
+        if (evalData.perce !== undefined) apiObs.perce = evalData.perce;
+        if (evalData.percements) apiObs.percements = evalData.percements;
+        displayEvalResult(apiObs, evalData);
+      } catch (e) {
+        console.warn('[createAndEvaluateObstacle] Erreur évaluation:', e.message);
+        showToast('Obstacle sauvegardé — évaluation OLS non disponible', 'warn');
+      }
+    } else {
+      // Data Technician: l'obstacle est créé en "Draft" (Défaut backend), pas d'évaluation automatique
+      apiObs.status = 'draft';
     }
 
     if (!apiObs.creatorId) apiObs.creatorId = App.user?._id || App.user?.id;
@@ -406,7 +398,19 @@ async function fetchObstacleCreators() {
     });
     App.allObstacles.forEach(obs => {
       const ev = byObstacleId[obs._id];
-      if (ev?.utilisateur_id?.email) obs.soumisParEmail = ev.utilisateur_id.email;
+      if (ev?.utilisateur_id) {
+        const u = ev.utilisateur_id;
+        // Extraire l'email
+        if (u.email) obs.soumisParEmail = u.email;
+        // Extraire le nom complet si disponible (nom, prenom, username, etc.)
+        const nom = [u.prenom, u.nom].filter(Boolean).join(' ').trim()
+          || u.username || u.name || u.nomComplet || '';
+        if (nom) obs.soumisParNom = nom;
+        // Affichage combiné : "Prénom NOM <email>" ou juste email
+        obs.soumisParDisplay = nom
+          ? `${nom}${u.email ? ' — ' + u.email : ''}`
+          : (u.email || '—');
+      }
     });
     filterObstacles();
   } catch (e) {
@@ -506,8 +510,41 @@ function renderObstaclesList(list) {
     const temporal = buildTemporalBadge(obs);
     const clearance = (typeof formatClearanceBadge === 'function') ? formatClearanceBadge(obs) : '—';
     const soumisCell = showSoumis
-      ? `<td style="font-size:10px;color:var(--text-secondary);">${obs.soumisParEmail || obs.creatorEmail || '—'}</td>`
+      ? `<td style="font-size:10px;color:var(--text-secondary);" title="${obs.soumisParEmail || obs.creatorEmail || '—'}">${obs.soumisParDisplay || obs.soumisParEmail || obs.creatorEmail || obs.soumisParNom || '—'}</td>`
       : '';
+    // Surface(s) concernée(s) — surfaces OLS percées par l'obstacle, avec badges colorés
+    const breachedSurfs = (typeof computeBreachedSurfaces === 'function') ? computeBreachedSurfaces(obs) : [];
+
+    // Palette couleur par famille de surface OLS
+    const surfaceColor = (label = '') => {
+      const l = label.toLowerCase();
+      if (l.includes('approche') || l.includes('approch'))
+        return { bg: 'rgba(239,68,68,0.10)', border: 'rgba(239,68,68,0.30)', color: '#991B1B' };
+      if (l.includes('décollage') || l.includes('decollage') || l.includes('montée') || l.includes('montee'))
+        return { bg: 'rgba(245,158,11,0.10)', border: 'rgba(245,158,11,0.30)', color: '#B45309' };
+      if (l.includes('horizontale intérieure') || l.includes('horizontale interieure'))
+        return { bg: 'rgba(99,102,241,0.10)', border: 'rgba(99,102,241,0.30)', color: '#4338CA' };
+      if (l.includes('horizontale'))
+        return { bg: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.25)', color: '#4338CA' };
+      if (l.includes('conique'))
+        return { bg: 'rgba(14,165,233,0.10)', border: 'rgba(14,165,233,0.30)', color: '#0369A1' };
+      if (l.includes('transition'))
+        return { bg: 'rgba(168,85,247,0.10)', border: 'rgba(168,85,247,0.30)', color: '#7E22CE' };
+      if (l.includes('bande') || l.includes('resa'))
+        return { bg: 'rgba(16,185,129,0.10)', border: 'rgba(16,185,129,0.30)', color: '#065F46' };
+      // défaut rouge doux
+      return { bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.20)', color: '#991B1B' };
+    };
+
+    const surfaceCell = breachedSurfs.length
+      ? `<div class="surface-tags-cell">${breachedSurfs.map(b => {
+          const c = surfaceColor(b.label);
+          return `<span class="surface-tag-pill" style="background:${c.bg};border-color:${c.border};color:${c.color};"
+            title="Dépassement : ${b.depassementM != null ? b.depassementM.toFixed(1) + ' m' : 'N/A'}">
+            <span class="surface-tag-dot" style="background:${c.color};"></span>${b.label}
+          </span>`;
+        }).join('')}</div>`
+      : `<span class="surface-tag-none ${penetrates ? 'surface-tag-unknown' : 'surface-tag-ok'}">—</span>`;
     return `<tr>
       <td style="font-weight:600;">${obs.name}</td>
       <td>${typeToLabel(obs.type)}</td>
@@ -519,7 +556,7 @@ function renderObstaclesList(list) {
       <td>${temporal}</td>
       <td>${verdict}</td>
       <td>${clearance}</td>
-      <td>${buildBalisageSelect(obs)}</td>
+      <td>${surfaceCell}</td>
       <td>${buildActionSelect(obs)}</td>
       <td>${statusTag}</td>
       ${soumisCell}
@@ -654,32 +691,57 @@ window.toggleAllObstacles = function () {
 /** Construit les boutons d'action workflow selon le statut de l'obstacle */
 function buildWorkflowActions(obs) {
   const actions = [];
-  const isAdmin = getIsAdmin();
+  const isAdmin = typeof getIsAdmin === 'function' ? getIsAdmin() : false;
+  const isEvaluator = typeof getIsEvaluator === 'function' ? getIsEvaluator() : false;
+  const isDataTech = typeof getIsDataTech === 'function' ? getIsDataTech() : false;
 
-  // Voir le détail de pénétration (surfaces percées, dépassement en mètres)
+  // Voir le détail de pénétration
   actions.push(`<button class="action-btn" onclick="showObstacleConformityDetail('${obs._id}')" title="Détail conformité">DÉTAIL</button>`);
 
   // Rapport PDF individuel
   actions.push(`<button class="action-btn pdf-btn" onclick="generatePdfReportSingle('${obs._id}')" title="Rapport PDF de cet obstacle">PDF</button>`);
 
-  // Édition des attributs — retours n°10 (manipuler les obstacles) et n°18
-  actions.push(`<button class="action-btn" onclick="editObstacle('${obs._id}')" title="Modifier l'obstacle">MODIFIER</button>`);
+  // Édition des attributs (Admin, Data Technician, Evaluator)
+  if (isAdmin || isDataTech || isEvaluator) {
+    actions.push(`<button class="action-btn" onclick="editObstacle('${obs._id}')" title="Modifier l'obstacle">MODIFIER</button>`);
+  }
 
-  // Tout utilisateur peut soumettre son brouillon
-  if (obs.status === 'draft')
+  // Soumettre
+  if (obs.status === 'draft' && (isAdmin || isDataTech || isEvaluator)) {
     actions.push(`<button class="action-btn pending" onclick="setObstacleStatus('${obs._id}','pending')">SOUMETTRE</button>`);
+  }
 
-  // Admin peut VALIDER ou REJETER les obstacles en attente
-  if (obs.status === 'pending' && isAdmin) {
+  // Évaluer (OLS) — Automatique si Backend le fait, mais déclenchable manuellement par Evaluator/Admin
+  if (obs.status === 'pending' && (isAdmin || isEvaluator)) {
+    actions.push(`<button class="action-btn pending" style="border-color:var(--indigo); color:var(--indigo)" onclick="evaluerObstacle('${obs._id}')" title="Évaluer les perçages OLS">ÉVALUER (OLS)</button>`);
+  }
+
+  // Valider ou Rejeter (Admin, Evaluator)
+  if (obs.status === 'pending' && (isAdmin || isEvaluator)) {
     actions.push(`<button class="action-btn validate" onclick="setObstacleStatus('${obs._id}','validated')">VALIDER</button>`);
     actions.push(`<button class="action-btn reject"   onclick="setObstacleStatus('${obs._id}','draft')">REJETER</button>`);
   }
 
-  // Admin peut toujours supprimer. Utilisateur peut supprimer son brouillon.
-  if (isAdmin || obs.status === 'draft') {
+  // Supprimer (Tous les rôles d'édition)
+  if (isAdmin || isDataTech || isEvaluator) {
     actions.push(`<button class="action-btn delete" onclick="confirmDelete('${obs._id}','${obs.name.replace(/'/g, "\\'")}')">✕</button>`);
   }
   return `<div class="action-group">${actions.join('')}</div>`;
+}
+
+/**
+ * Fonction explicite pour déclencher l'évaluation OLS d'un obstacle
+ */
+async function evaluerObstacle(id) {
+  try {
+    const res = await apiFetch(`/obstacles/${id}/evaluer`, 'POST');
+    const evalData = res.data || {};
+    showToast('Évaluation OLS terminée.', 'info');
+    // Rafraîchir les obstacles pour voir le statut final
+    loadObstacles();
+  } catch (e) {
+    showToast("Erreur lors de l'évaluation : " + e.message, 'error');
+  }
 }
 
 /** Affiche le détail de conformité (surfaces percées, dépassement en m) d'un obstacle dans le panneau de droite */
@@ -827,16 +889,25 @@ async function updateObstacle(id, payload) {
     };
     updated._id = id;
 
-    // Ré-évaluer après modification (la position/altitude a pu changer)
-    try {
-      const evalRes = await apiFetch(`/obstacles/${id}/evaluer`, 'POST');
-      const evalData = evalRes.data || {};
-      if (evalData.statut_resultant) updated.status = normalizeStatusBack(evalData.statut_resultant);
-      if (evalData.perce !== undefined) updated.perce = evalData.perce;
-      if (evalData.percements) updated.percements = evalData.percements;
-      displayEvalResult(updated, evalData);
-    } catch (e) {
-      console.warn('[updateObstacle] évaluation post-édition indisponible', e.message);
+    // Ré-évaluer après modification (réservé Admin et Evaluator)
+    const isAdmin = typeof getIsAdmin === 'function' ? getIsAdmin() : false;
+    const isEvaluator = typeof getIsEvaluator === 'function' ? getIsEvaluator() : false;
+    
+    if (isAdmin || isEvaluator) {
+      try {
+        const evalRes = await apiFetch(`/obstacles/${id}/evaluer`, 'POST');
+        const evalData = evalRes.data || {};
+        if (evalData.statut_resultant) updated.status = normalizeStatusBack(evalData.statut_resultant);
+        if (evalData.perce !== undefined) updated.perce = evalData.perce;
+        if (evalData.percements) updated.percements = evalData.percements;
+        displayEvalResult(updated, evalData);
+      } catch (e) {
+        console.warn('[updateObstacle] évaluation post-édition indisponible', e.message);
+      }
+    } else {
+      // Data Technician: l'obstacle retourne automatiquement en "Pending" (backend)
+      // Mettre à jour localement pour refléter le changement
+      updated.status = 'pending';
     }
 
     [App.allObstacles, App.obstacles].forEach(arr => {
@@ -896,6 +967,8 @@ async function evaluateAllObstacles() {
 /* ══════════════════════════════════════════════════════════
    EXPORT CSV DES OBSTACLES EN PÉNÉTRATION — retour utilisateur n°8
    Répertorie, après une évaluation globale, tous les obstacles qui
+   pénètrent une surface OLS et génère un fichier CSV.
+══════════════════════════════════════════════════════════ */
 function exportPenetrationsCsv() {
   const penetrating = App.allObstacles.filter(o => checkPenetration(o));
   if (!penetrating.length) { showToast('Aucun obstacle en pénétration à exporter', 'info'); return; }

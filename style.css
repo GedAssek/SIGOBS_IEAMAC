@@ -87,6 +87,9 @@ body {
   font-weight: 500;
   line-height: 1.5;
   overflow: hidden;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 /* ── SCREENS ─────────────────────────────────────────────── */
@@ -1199,6 +1202,14 @@ body {
   color: var(--text-primary);
 }
 
+/* La colonne "Surface concernée" permet le wrapping vertical des pills */
+.data-table td:has(.surface-tags-cell) {
+  white-space: normal;
+  vertical-align: top;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
 .data-table tr:hover td {
   background: rgba(14, 165, 233, 0.04);
 }
@@ -1958,7 +1969,10 @@ body {
   border-radius: var(--radius-lg);
   padding: 30px 34px;
   min-width: 320px;
-  max-width: 440px;
+  max-width: 700px;
+  width: calc(100vw - 48px);
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
   box-shadow: var(--shadow-xl), 0 0 0 1px rgba(255,255,255,0.8) inset;
   animation: modalPop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -3439,3 +3453,489 @@ body {
 /* OBS PAGE HEADER */
 .obs-page-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; }
 .obs-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+
+/* ═══════════════════════════════════════════════════════════
+   SURFACE CONCERNÉE — Badges pills colorés dans la table obstacles
+   Chaque surface OLS percée reçoit un badge couleur distinctif.
+═══════════════════════════════════════════════════════════ */
+.surface-tags-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 140px;
+  max-width: 200px;
+}
+
+.surface-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 6px;
+  border-radius: 4px;
+  border: 1px solid;
+  font-family: var(--font-label);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  cursor: default;
+  transition: filter 0.15s, box-shadow 0.15s;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.surface-tag-pill:hover {
+  filter: brightness(0.95);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+}
+
+.surface-tag-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.surface-tag-none {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 2px 0;
+}
+
+.surface-tag-ok {
+  color: var(--green);
+}
+
+.surface-tag-unknown {
+  color: var(--text-dim);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVE DESIGN — Adaptation multi-écran
+   Breakpoints : 1280px · 1024px · 768px · 540px · 360px
+═══════════════════════════════════════════════════════════ */
+
+/* ── 1280px : Écrans intermédiaires (laptops 13") ─────────── */
+@media (max-width: 1280px) {
+  /* Réduire les colonnes du layout principal */
+  .app-layout {
+    grid-template-columns: 240px 1fr 230px;
+  }
+
+  /* Réduire la topbar */
+  .tab-btn {
+    font-size: 11.5px;
+    padding: 5px 10px;
+    letter-spacing: 0.02em;
+  }
+
+  .study-name {
+    max-width: 160px;
+  }
+
+  .utc-display {
+    font-size: 13px;
+    padding: 3px 8px;
+  }
+
+  /* Login */
+  .login-card {
+    width: 400px;
+    padding: 36px 32px;
+  }
+}
+
+/* ── 1024px : Tablettes landscape / petits laptops ───────── */
+@media (max-width: 1024px) {
+  /* Layout passage 3→2 colonnes */
+  .app-layout {
+    grid-template-columns: 220px 1fr;
+  }
+
+  /* Masquer le panel droit par défaut (conformité) */
+  .app-layout > .panel-right {
+    display: none;
+  }
+
+  /* Layout analyse : passer en 1 seule colonne verticale */
+  .app-layout-analyse {
+    grid-template-columns: 1fr;
+  }
+
+  /* Réduire la sidebar gauche de l'onglet Analyse */
+  #tab-analyse .panel-left {
+    display: none;
+  }
+
+  /* Topbar : masquer séparateur */
+  .topbar-sep {
+    display: none;
+  }
+
+  /* Masquer l'affichage aérodrome complet */
+  .study-elev {
+    display: none;
+  }
+
+  .study-name {
+    max-width: 130px;
+  }
+
+  /* Tab nav wraps sur deux lignes si nécessaire */
+  .tab-nav {
+    flex-wrap: wrap;
+    gap: 2px;
+  }
+
+  .tab-btn {
+    font-size: 11px;
+    padding: 4px 9px;
+  }
+
+  /* Modal : max-width adaptatif */
+  .modal-box {
+    max-width: 90vw;
+    padding: 24px 22px;
+  }
+
+  /* Table : s'assurer que le scroll horizontal fonctionne bien */
+  .table-wrap {
+    overflow-x: auto;
+  }
+
+  /* Réduire les colonnes runways/aerodromes */
+  #tab-runways .app-layout,
+  #tab-aerodromes .app-layout,
+  #tab-users .app-layout {
+    grid-template-columns: 280px 1fr;
+  }
+}
+
+/* ── 768px : Tablettes portrait ──────────────────────────── */
+@media (max-width: 768px) {
+  /* Topbar en deux rangées */
+  .topbar {
+    height: auto;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .topbar-left,
+  .topbar-right {
+    gap: 6px;
+  }
+
+  .topbar-center {
+    order: 3;
+    width: 100%;
+    justify-content: flex-start;
+    flex: unset;
+  }
+
+  /* Réduire le nom de l'app */
+  .app-name {
+    font-size: 13px;
+  }
+
+  /* Scroll horizontal pour les onglets */
+  .tab-nav {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .tab-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-btn {
+    font-size: 10.5px;
+    padding: 4px 8px;
+    flex-shrink: 0;
+  }
+
+  /* User pill compact */
+  .user-name {
+    display: none;
+  }
+
+  .user-role-badge {
+    display: none;
+  }
+
+  /* UTC masqué */
+  .utc-display {
+    display: none;
+  }
+
+  /* Layout en 1 seule colonne */
+  .app-layout,
+  #tab-runways .app-layout,
+  #tab-aerodromes .app-layout,
+  #tab-users .app-layout {
+    grid-template-columns: 1fr;
+  }
+
+  /* Panels latéraux en overlay scrollable sur les tabs sans map */
+  .panel-left {
+    max-height: 280px;
+    overflow-y: auto;
+    border-right: none;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  }
+
+  /* Runway bar compact */
+  .runway-bar {
+    height: auto;
+    padding: 6px 10px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .runway-meta {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Obstacles page header */
+  .obs-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .obs-filters {
+    width: 100%;
+  }
+
+  .obs-filters > * {
+    flex: 1 1 auto;
+    min-width: 120px;
+  }
+
+  /* Boutons obstacles header wrap */
+  .obs-page-header > div:last-child {
+    flex-wrap: wrap;
+  }
+
+  /* Données table compact */
+  .data-table th,
+  .data-table td {
+    padding: 7px 8px;
+    font-size: 12.5px;
+  }
+
+  /* Surface tags plus compacts */
+  .surface-tags-cell {
+    min-width: 110px;
+    max-width: 150px;
+  }
+
+  .surface-tag-pill {
+    font-size: 9.5px;
+    padding: 1px 6px 1px 5px;
+  }
+
+  /* Login card */
+  .login-card {
+    width: calc(100vw - 32px);
+    max-width: 400px;
+    padding: 28px 24px;
+  }
+
+  /* Modal */
+  .modal-box {
+    min-width: unset;
+    width: calc(100vw - 32px);
+    max-width: calc(100vw - 32px);
+    padding: 20px 18px;
+  }
+
+  /* Runway management items */
+  .runway-mgmt-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .runway-mgmt-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Grid panels */
+  .oe-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── 540px : Petits téléphones ───────────────────────────── */
+@media (max-width: 540px) {
+  /* Topbar encore plus compact */
+  .app-logo {
+    gap: 6px;
+  }
+
+  .app-name {
+    font-size: 12px;
+  }
+
+  .study-label {
+    display: none;
+  }
+
+  .study-aerodrome-badge {
+    display: none;
+  }
+
+  .study-icao {
+    font-size: 12px;
+    min-width: 30px;
+  }
+
+  /* Onglets : font encore plus petite */
+  .tab-btn {
+    font-size: 10px;
+    padding: 3px 7px;
+  }
+
+  /* Boutons de la barre d'obstacles : texte court */
+  .btn-primary,
+  .btn-ghost {
+    font-size: 11px;
+    padding: 7px 10px;
+  }
+
+  /* Table : réduire encore les colonnes */
+  .data-table th,
+  .data-table td {
+    padding: 6px 6px;
+    font-size: 11.5px;
+  }
+
+  /* Surface tag pills encore plus petits */
+  .surface-tag-pill {
+    font-size: 9px;
+    padding: 1px 5px 1px 4px;
+    gap: 3px;
+  }
+
+  .surface-tag-dot {
+    width: 5px;
+    height: 5px;
+  }
+
+  /* Panel left en accordéon style */
+  .panel-left {
+    max-height: 240px;
+  }
+
+  /* Toast container */
+  .toast-container {
+    bottom: 10px;
+    right: 10px;
+    left: 10px;
+  }
+
+  .toast {
+    min-width: unset;
+    max-width: 100%;
+  }
+
+  /* Login */
+  .login-card {
+    width: calc(100vw - 24px);
+    padding: 24px 18px;
+    border-radius: var(--radius-md);
+  }
+
+  .login-logo {
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .logo-main {
+    font-size: 24px;
+  }
+
+  /* Modal box */
+  .modal-box {
+    width: calc(100vw - 16px);
+    padding: 16px 14px;
+  }
+
+  /* Obs page header boutons */
+  .obs-page-header > div:last-child {
+    gap: 6px;
+  }
+
+  .obs-page-header > div:last-child .btn-primary,
+  .obs-page-header > div:last-child .btn-ghost {
+    font-size: 10px;
+    padding: 6px 8px;
+  }
+}
+
+/* ── 360px : Très petits téléphones ─────────────────────── */
+@media (max-width: 360px) {
+  .app-name {
+    display: none;
+  }
+
+  .tab-btn {
+    font-size: 9.5px;
+    padding: 3px 6px;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 5px 5px;
+    font-size: 11px;
+  }
+
+  .login-card {
+    padding: 20px 14px;
+  }
+}
+
+/* ── Utilitaires responsive ──────────────────────────────── */
+/* Assurer que les tables ont toujours un scroll horizontal */
+.data-table {
+  min-width: 600px;
+}
+
+/* Le wrapper table gère le scroll */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Scrollbar fine universelle pour les zones scroll */
+.panel-body::-webkit-scrollbar,
+.table-wrap::-webkit-scrollbar,
+.runway-tabs::-webkit-scrollbar,
+.tab-nav::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+
+.panel-body::-webkit-scrollbar-thumb,
+.table-wrap::-webkit-scrollbar-thumb,
+.runway-tabs::-webkit-scrollbar-thumb,
+.tab-nav::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 2px;
+}
+
+/* Métadonnées DMS : flex-wrap sur petits écrans */
+@media (max-width: 768px) {
+  .dms-row {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+}

@@ -35,7 +35,20 @@ async function handleLogin() {
       // Persistance de session (sessionStorage, pas localStorage pour plus de sécurité)
       sessionStorage.setItem('sigobs_token', App.token);
       sessionStorage.setItem('sigobs_user',  JSON.stringify(App.user));
-      showApp();
+      
+      if (email === password) {
+        // Première connexion (le mot de passe est l'email)
+        App.forcePasswordChange = true;
+        document.getElementById('screen-login').classList.remove('active');
+        openChangePasswordModal();
+        const cpCurrent = document.getElementById('cp-current-password');
+        if (cpCurrent) {
+          cpCurrent.value = password;
+          cpCurrent.setAttribute('readonly', 'true');
+        }
+      } else {
+        showApp();
+      }
     } else {
       showLoginError(res.message || 'Authentification refusée.');
     }
@@ -150,18 +163,26 @@ function showApp() {
     : (String(roleRaw || 'USER'));
   // Stocker la string normalisée pour les vérifications isAdmin
   App.user._roleName = roleName;
-  const isAdmin = roleName.toLowerCase() === 'admin';
+  const isAdmin = getIsAdmin();
+  const isEvaluator = getIsEvaluator();
+  const isDataTech = getIsDataTech();
+
   if (nameEl) nameEl.textContent = App.user.email || App.user.nom || '—';
   if (roleEl) roleEl.textContent = roleName;
 
   const btnRunways = document.getElementById('tab-btn-runways');
   const btnAerodromes = document.getElementById('tab-btn-aerodromes');
   const btnUsers = document.getElementById('tab-btn-users');
+  const btnArchive = document.getElementById('tab-btn-archive');
   const btnToggleAllObs = document.getElementById('btn-toggle-all-obs');
-  if (btnRunways) btnRunways.style.display = isAdmin ? 'block' : 'none';
-  if (btnAerodromes) btnAerodromes.style.display = isAdmin ? 'block' : 'none';
+  
+  // RBAC Tab access logic based on API documentation
+  if (btnRunways) btnRunways.style.display = (isAdmin || isEvaluator) ? 'block' : 'none';
+  if (btnAerodromes) btnAerodromes.style.display = (isAdmin || isEvaluator) ? 'block' : 'none';
+  if (btnArchive) btnArchive.style.display = (isAdmin || isEvaluator) ? 'block' : 'none';
   if (btnUsers) btnUsers.style.display = isAdmin ? 'block' : 'none';
-  if (btnToggleAllObs) btnToggleAllObs.style.display = isAdmin ? 'flex' : 'none';
+  
+  if (btnToggleAllObs) btnToggleAllObs.style.display = (isAdmin || isEvaluator) ? 'flex' : 'none';
 
   setApiStatus('connected');
 
@@ -180,7 +201,13 @@ function showApp() {
 
 /** Ouvre la modale et réinitialise les champs */
 function openChangePasswordModal() {
-  document.getElementById('cp-current-password').value = '';
+  const cpCurrent = document.getElementById('cp-current-password');
+  if (cpCurrent) {
+    if (!App.forcePasswordChange) {
+      cpCurrent.value = '';
+      cpCurrent.removeAttribute('readonly');
+    }
+  }
   document.getElementById('cp-new-password').value     = '';
   document.getElementById('cp-confirm-password').value = '';
   document.getElementById('cp-error').classList.add('hidden');
@@ -192,12 +219,28 @@ function openChangePasswordModal() {
   btn.disabled = false;
   btn.querySelector('.cp-btn-label').classList.remove('hidden');
   btn.querySelector('.cp-btn-loader').classList.add('hidden');
+  
+  const closeBtn = document.querySelector('.cp-close-btn');
+  if (closeBtn) {
+    closeBtn.style.display = App.forcePasswordChange ? 'none' : 'block';
+  }
+  
+  const title = document.getElementById('cp-modal-title');
+  if (title) {
+    title.textContent = App.forcePasswordChange ? 'CRÉATION DU MOT DE PASSE (Requis)' : 'CHANGEMENT DE MOT DE PASSE';
+  }
+  
   document.getElementById('change-password-overlay').classList.remove('hidden');
-  setTimeout(() => document.getElementById('cp-current-password').focus(), 80);
+  if (!App.forcePasswordChange) {
+    setTimeout(() => document.getElementById('cp-current-password').focus(), 80);
+  } else {
+    setTimeout(() => document.getElementById('cp-new-password').focus(), 80);
+  }
 }
 
 /** Ferme la modale (clic sur fond ou bouton ✕/Annuler) */
 function closeChangePasswordModal(e) {
+  if (App.forcePasswordChange) return; // Empêcher la fermeture si changement forcé
   if (e && e.target !== document.getElementById('change-password-overlay')) return;
   document.getElementById('change-password-overlay').classList.add('hidden');
 }
@@ -283,7 +326,13 @@ async function handleChangePassword() {
     document.getElementById('cp-strength-fill').style.width = '0%';
     document.getElementById('cp-strength-label').textContent = '';
     showToast('Mot de passe modifié avec succès', 'success');
-    setTimeout(() => document.getElementById('change-password-overlay').classList.add('hidden'), 1800);
+    setTimeout(() => {
+      document.getElementById('change-password-overlay').classList.add('hidden');
+      if (App.forcePasswordChange) {
+        App.forcePasswordChange = false;
+        showApp();
+      }
+    }, 1800);
   } catch (e) {
     errEl.textContent = e.message || 'Erreur lors du changement de mot de passe.';
     errEl.classList.remove('hidden');
@@ -292,4 +341,20 @@ async function handleChangePassword() {
     loader.classList.add('hidden');
     btn.disabled = false;
   }
+}
+
+/* ══════════════════════════════════════════════════════════
+   HELPERS RBAC (Role-Based Access Control)
+══════════════════════════════════════════════════════════ */
+function getIsAdmin() {
+  return (App.user?._roleName || '').toLowerCase().includes('admin');
+}
+
+function getIsEvaluator() {
+  return (App.user?._roleName || '').toLowerCase().includes('evaluator');
+}
+
+function getIsDataTech() {
+  return (App.user?._roleName || '').toLowerCase().includes('data technician') || 
+         (App.user?._roleName || '').toLowerCase().includes('technician');
 }

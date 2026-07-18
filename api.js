@@ -137,6 +137,21 @@ function normalizeObstacleFromAPI(raw) {
     // Email de l'utilisateur soumettant (pour la colonne admin)
     creatorEmail: raw.createur_id?.email || raw.user?.email || raw.creatorEmail || '',
     soumisParEmail: raw.soumis_par?.email || raw.createur_id?.email || raw.user?.email || raw.soumisParEmail || '',
+    // Nom complet du soumetteur (si disponible dans l'objet peuplé)
+    soumisParNom: (() => {
+      const u = raw.soumis_par || raw.createur_id || raw.user;
+      if (!u || typeof u !== 'object') return '';
+      return [u.prenom, u.nom].filter(Boolean).join(' ').trim() || u.username || u.name || u.nomComplet || '';
+    })(),
+    // Affichage combiné nom + email pour la colonne "Soumis par"
+    soumisParDisplay: (() => {
+      const u = raw.soumis_par || raw.createur_id || raw.user;
+      if (!u || typeof u !== 'object') return raw.soumis_par?.email || raw.createur_id?.email || '';
+      const nom = [u.prenom, u.nom].filter(Boolean).join(' ').trim() || u.username || u.name || '';
+      const email = u.email || '';
+      if (nom && email) return `${nom} — ${email}`;
+      return nom || email || '';
+    })(),
     createdAt: raw.createdAt,
   };
 }
@@ -218,6 +233,14 @@ function showModal(title, body, onConfirm) {
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-body').innerHTML = body;
   App.modalAction = onConfirm;
+  
+  // Reset le bouton de confirmation par défaut (s'il avait été modifié par une autre fonction)
+  const confirmBtn = document.querySelector('.modal-actions button:last-child');
+  if (confirmBtn) {
+    confirmBtn.textContent = 'CONFIRMER';
+    confirmBtn.className = 'btn-danger';
+  }
+  
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
 function closeModal() { document.getElementById('modal-overlay').classList.add('hidden'); App.modalAction = null; }

@@ -319,7 +319,7 @@
             </div>
           </div>
 
-          <div class="conf-engine-line">Moteur : API Backend PANS-OPS · Annexe 14</div>
+          <div class="conf-engine-line">IEAMAC 2023</div>
         </aside>
 
       </div>
@@ -405,7 +405,7 @@
                 <th>TEMPOREL</th>
                 <th>VERDICT OLS</th>
                 <th>DÉGAGEMENT</th>
-                <th>BALISAGE</th>
+                <th>SURFACE CONCERNÉE</th>
                 <th>ACTION</th>
                 <th>WORKFLOW</th>
                 <th id="obs-col-soumis" style="display:none">SOUMIS PAR</th>
@@ -1037,17 +1037,21 @@
               <label class="field-label">EMAIL</label>
               <input id="user-email" type="email" class="field-input" placeholder="utilisateur@domaine.com" />
             </div>
-            <div class="field-group">
-              <label class="field-label">MOT DE PASSE</label>
-              <input id="user-password" type="password" class="field-input" placeholder="••••••••" />
-            </div>
+
             <div class="field-group">
               <label class="field-label">RÔLE</label>
               <select id="user-role-select" class="field-select">
                 <option value="">— Choisir un rôle —</option>
               </select>
             </div>
-            <button class="btn-primary btn-full" onclick="createUser()" style="margin-top:15px;">
+            <div class="field-group" style="margin-top:5px;">
+              <label class="field-label">AÉRODROMES ASSOCIÉS</label>
+              <input type="text" id="user-aero-search" class="field-input" placeholder="Rechercher (ex: DXXX)..." oninput="filterUserAerodromes()" />
+              <div id="user-aero-checkboxes" style="max-height:140px; overflow-y:auto; border:1px solid rgba(148, 163, 184, 0.3); border-radius:var(--radius-sm); padding:8px; margin-top:4px; display:flex; flex-direction:column; gap:6px; background:var(--bg-input);">
+                <div class="empty-msg" style="font-size:11px;">Chargement...</div>
+              </div>
+            </div>
+            <button class="btn-primary btn-full" onclick="reviewUserCreation()" style="margin-top:15px;">
               CRÉER L'UTILISATEUR
             </button>
             <hr style="border:none; border-top:1px solid var(--border); margin:15px 0;" />
