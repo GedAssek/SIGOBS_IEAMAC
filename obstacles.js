@@ -121,8 +121,8 @@ function isObstacleDuplicate(name, lat, lon) {
   const nameLower = (name || '').trim().toLowerCase();
   return (App.allObstacles || []).some(obs => {
     const sameName = (obs.name || '').trim().toLowerCase() === nameLower;
-    const sameLat  = obs.latitude  != null && Math.abs(obs.latitude  - lat) < 0.000001;
-    const sameLon  = obs.longitude != null && Math.abs(obs.longitude - lon) < 0.000001;
+    const sameLat = obs.latitude != null && Math.abs(obs.latitude - lat) < 0.000001;
+    const sameLon = obs.longitude != null && Math.abs(obs.longitude - lon) < 0.000001;
     return sameName && sameLat && sameLon;
   });
 }
@@ -988,7 +988,7 @@ async function generatePdfReport() {
   } else {
     _drawObstaclesTable(doc, App.allObstacles, y, { BG, PANEL, TEXT, DIM, CYAN, GREEN, RED }, W);
     y = _lastObstaclesTableY + 4;
-    
+
     // Si on est trop bas sur la page, on crée une nouvelle page pour le cadre final
     if (y + 24 > 200) {
       doc.addPage();
@@ -1000,13 +1000,13 @@ async function generatePdfReport() {
     doc.setFillColor(...PANEL); doc.rect(10, y, W, 22, 'F');
     doc.setDrawColor(...(penetrations > 0 ? RED : GREEN)); doc.setLineWidth(1.2);
     doc.rect(10, y, W, 22, 'S');
-    
+
     doc.setFontSize(14); doc.setFont('courier', 'bold');
     doc.setTextColor(...(penetrations > 0 ? RED : GREEN));
-    doc.text(`STATUT GLOBAL : ${penetrations > 0 ? 'NON CONFORME' : 'CONFORME'}`, 10 + W/2, y + 10, { align: 'center' });
-    
+    doc.text(`STATUT GLOBAL : ${penetrations > 0 ? 'NON CONFORME' : 'CONFORME'}`, 10 + W / 2, y + 10, { align: 'center' });
+
     doc.setFontSize(10); doc.setTextColor(...TEXT);
-    doc.text(`${App.allObstacles.length} obstacle(s)   |   ${conformes} conforme(s)   |   ${penetrations} pénétration(s)`, 10 + W/2, y + 17, { align: 'center' });
+    doc.text(`${App.allObstacles.length} obstacle(s)   |   ${conformes} conforme(s)   |   ${penetrations} pénétration(s)`, 10 + W / 2, y + 17, { align: 'center' });
   }
 
   doc.save(`SIGOBS_OLS_${App.aerodrome?.icao || 'AERO'}_${now.toISOString().slice(0, 10)}.pdf`);
@@ -1074,7 +1074,7 @@ window.generatePdfReportSingle = function (id) {
   y += 2;
 
   // ── Section 3 : Analyse OLS ────────────────────────────────────────
-  section('3', 'ANALYSE OLS (ICAO ANNEXE 14)');
+  section('3', 'ANALYSE OLS (OACI ANNEXE 14)');
 
   let admStr = '—', surfStr = '—', clearanceStr = '—', clearanceVal = null;
   let horsSurfaces = false;
@@ -1136,7 +1136,7 @@ let _lastObstaclesTableY = 36;
 function _drawObstaclesTable(doc, list, startY, colors, W) {
   const { BG, PANEL, TEXT, DIM, CYAN, GREEN, RED } = colors;
   const X = 10; let y = startY;
-  
+
   // Columns: DÉSIGNATION | COORDONNÉES (LAT+LON) | ALT. | ALT.ADM. | DÉGAGEMENT | SURFACES | VERDICT
   // x0      x1            x2     x3              x4     x5         x6            x7         x8
   const x0 = X;
@@ -1162,13 +1162,13 @@ function _drawObstaclesTable(doc, list, startY, colors, W) {
     doc.setFontSize(7.5); doc.setTextColor(...TEXT); doc.setFont('courier', 'bold');
     doc.text('DÉSIGNATION', (x0 + x1) / 2, y + 8.5, { align: 'center' });
     doc.text('COORDONNÉES', (x1 + x3) / 2, y + 4.5, { align: 'center' });
-    doc.text('LATITUDE',   (x1 + x2) / 2, y + 11.5, { align: 'center' });
-    doc.text('LONGITUDE',  (x2 + x3) / 2, y + 11.5, { align: 'center' });
-    doc.text('ALT. (m)',   (x3 + x4) / 2, y + 8.5, { align: 'center' });
-    doc.text('ALT.ADM.(m)',(x4 + x5) / 2, y + 8.5, { align: 'center' });
+    doc.text('LATITUDE', (x1 + x2) / 2, y + 11.5, { align: 'center' });
+    doc.text('LONGITUDE', (x2 + x3) / 2, y + 11.5, { align: 'center' });
+    doc.text('ALT. (m)', (x3 + x4) / 2, y + 8.5, { align: 'center' });
+    doc.text('ALT.ADM.(m)', (x4 + x5) / 2, y + 8.5, { align: 'center' });
     doc.text('DÉGAGT (m)', (x5 + x6) / 2, y + 8.5, { align: 'center' });
-    doc.text('SURFACES',   (x6 + x7) / 2, y + 8.5, { align: 'center' });
-    doc.text('VERDICT OLS',(x7 + x8) / 2, y + 8.5, { align: 'center' });
+    doc.text('SURFACES', (x6 + x7) / 2, y + 8.5, { align: 'center' });
+    doc.text('VERDICT OLS', (x7 + x8) / 2, y + 8.5, { align: 'center' });
     y += 14;
   };
 
@@ -1178,7 +1178,7 @@ function _drawObstaclesTable(doc, list, startY, colors, W) {
     const breach = checkPenetration(obs);
     doc.setFillColor(...(breach ? [254, 226, 226] : (ri % 2 === 0 ? [255, 255, 255] : [248, 250, 252])));
     doc.rect(X, y, W, 7, 'F');
-    
+
     doc.setDrawColor(203, 213, 225); doc.setLineWidth(0.1);
     doc.line(x0, y + 7, x8, y + 7);
     [x0, x1, x2, x3, x4, x5, x6, x7, x8].forEach(x => doc.line(x, y, x, y + 7));
@@ -1188,10 +1188,10 @@ function _drawObstaclesTable(doc, list, startY, colors, W) {
       const res = computeObstacleClearance(obs);
       if (res.horsSurfaces) { admStr = 'H.S.'; surfStr = '—'; clearanceStr = 'H.S.'; }
       else {
-        admStr       = res.admissibleM  != null ? res.admissibleM.toFixed(1)  : '—';
+        admStr = res.admissibleM != null ? res.admissibleM.toFixed(1) : '—';
         clearanceVal = res.clearanceM;
-        clearanceStr = res.clearanceM   != null ? (res.clearanceM >= 0 ? '+' : '') + res.clearanceM.toFixed(1) : '—';
-        surfStr      = res.surfaceLabel || '—';
+        clearanceStr = res.clearanceM != null ? (res.clearanceM >= 0 ? '+' : '') + res.clearanceM.toFixed(1) : '—';
+        surfStr = res.surfaceLabel || '—';
       }
     }
     if (typeof computeBreachedSurfaces === 'function') {
@@ -1202,7 +1202,7 @@ function _drawObstaclesTable(doc, list, startY, colors, W) {
     doc.setFontSize(7.5); doc.setTextColor(...TEXT); doc.setFont('courier', 'normal');
     doc.text((obs.name || '—').slice(0, 18), x0 + 2, y + 4.5);
 
-    const latStr = obs.latitude  != null ? obs.latitude.toFixed(5)  + '°' : '—';
+    const latStr = obs.latitude != null ? obs.latitude.toFixed(5) + '°' : '—';
     const lonStr = obs.longitude != null ? obs.longitude.toFixed(5) + '°' : '—';
     doc.text(latStr, (x1 + x2) / 2, y + 4.5, { align: 'center' });
     doc.text(lonStr, (x2 + x3) / 2, y + 4.5, { align: 'center' });
@@ -1212,7 +1212,7 @@ function _drawObstaclesTable(doc, list, startY, colors, W) {
 
     // DÉGAGEMENT : vert si marge positive, rouge si pénétration
     const clrColor = (clearanceVal == null || clearanceStr === 'H.S.') ? DIM :
-                     clearanceVal < 0 ? RED : GREEN;
+      clearanceVal < 0 ? RED : GREEN;
     doc.setTextColor(...clrColor);
     doc.setFont('courier', 'bold');
     doc.text(clearanceStr, (x5 + x6) / 2, y + 4.5, { align: 'center' });
@@ -1230,8 +1230,8 @@ function _drawObstaclesTable(doc, list, startY, colors, W) {
       doc.addPage();
       const pageW = W > 200 ? 297 : 210;
       const pageH = W > 200 ? 210 : 297;
-      doc.setFillColor(...(BG || [255,255,255])); doc.rect(0, 0, pageW, pageH, 'F');
-      
+      doc.setFillColor(...(BG || [255, 255, 255])); doc.rect(0, 0, pageW, pageH, 'F');
+
       y = 15;
       drawHeader();
     }

@@ -110,40 +110,113 @@ function getClosestThreshold(lat, lon) {
   return { dist: minDist, altM: altSeuilM };
 }
 
-/** 
- * Trouve la distance minimale à la bande de piste.
+/**
+ * Calcule la distance latérale perpendiculaire de l'obstacle au bord de la
+ * bande de piste, ET l'altitude de référence de la piste au niveau de ce point.
+ *
+ * ICAO Annex 14 — Surface de transition :
+ *   L'altitude admissible = altitude du bord de la bande au point le plus proche
+ *                           + distancePerpendiculaire × (1/7)
+ *
+ * @returns {{ distM: number, altBaseM: number, fracAlongRunway: number } | null}
+ *   distM           : distance perpendiculaire (m) depuis l'obstacle jusqu'au bord de bande
+ *   altBaseM        : altitude AMSL (m) de l'axe de piste au point latéralement le plus proche
+ *   fracAlongRunway : fraction [0…1] de la projection de l'obstacle sur l'axe de piste
+ *                     (0 = seuil référence, 1 = seuil opposé).
+ *                     Valeur hors [0,1] = obstacle en dehors du prolongement de la piste.
  */
-function getClosestRunwayStripDist(lat, lon) {
-  const fc = GeoMap.surfacesGeoJSON;
-  if (!fc || !fc.features?.length || typeof turf === 'undefined') return null;
+function getTransitionStripInfo(lat, lon) {
+  if (!App.runways || !App.runways.length || typeof turf === 'undefined') return null;
   const pt = turf.point([lon, lat]);
-  let minDist = null;
-  
-  // 1. Chercher si un polygone bande_piste existe
-  fc.features.forEach(f => {
-    if (f.properties?.normalized_type !== 'bande_piste' || !f.geometry) return;
-    try {
-      const line = (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon') ? turf.polygonToLine(f) : f;
-      const d = turf.pointToLineDistance(pt, line, { units: 'meters' });
-      if (minDist == null || d < minDist) minDist = d;
-    } catch (e) {}
-  });
-  if (minDist != null) return minDist;
+  const fc = GeoMap.surfacesGeoJSON;
+  const altAdRefM = getAerodromeRefAltitudeM();
 
-  // 2. Fallback: distance à l'axe de piste - 75m (demi-largeur typique)
-  if (!App.runways || !App.runways.length) return null;
-  App.runways.forEach(r => {
-    if (r.thresholdLat != null && r.thresholdLon != null && r.reciprocal) {
-      const opp = App.runways.find(op => op.designation === r.reciprocal);
-      if (opp && opp.thresholdLat != null && opp.thresholdLon != null) {
-        const line = turf.lineString([[r.thresholdLon, r.thresholdLat], [opp.thresholdLon, opp.thresholdLat]]);
+  // ── Cas 1 : polygone bande_piste disponible ──────────────────────────────
+  // On calcule la distance au bord du polygone (déjà = bord de bande) et
+  // l'altitude de l'aérodrome comme base (pas d'info d'altitude par tranche).
+  // On récupère aussi la fraction longitudinale depuis l'axe de piste.
+  let fracFromRunway = 0.5; // valeur par défaut : "milieu de piste"
+  if (fc && fc.features?.length) {
+    let bestDist = null;
+    fc.features.forEach(f => {
+      if (f.properties?.normalized_type !== 'bande_piste' || !f.geometry) return;
+      try {
+        const line = (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon')
+          ? turf.polygonToLine(f) : f;
         const d = turf.pointToLineDistance(pt, line, { units: 'meters' });
-        const stripD = Math.max(0, d - 75);
-        if (minDist == null || stripD < minDist) minDist = stripD;
-      }
+        if (bestDist == null || d < bestDist) bestDist = d;
+      } catch (e) { }
+    });
+    if (bestDist != null) {
+      // Calculer la fraction le long de l'axe de piste pour vérification longitudinale
+      App.runways.forEach(r => {
+        if (r.thresholdLat == null || r.thresholdLon == null || !r.reciprocal) return;
+        const opp = App.runways.find(op => op.designation === r.reciprocal);
+        if (!opp || opp.thresholdLat == null || opp.thresholdLon == null) return;
+        const axeLine = turf.lineString([
+          [r.thresholdLon, r.thresholdLat],
+          [opp.thresholdLon, opp.thresholdLat],
+        ]);
+        try {
+          const snapped = turf.nearestPointOnLine(axeLine, pt, { units: 'meters' });
+          const frac = snapped.properties.location / turf.length(axeLine, { units: 'meters' });
+          fracFromRunway = Math.max(0, Math.min(1, frac)); // clamp pour cette estimation
+        } catch (e) { }
+      });
+      return { distM: bestDist, altBaseM: altAdRefM, fracAlongRunway: fracFromRunway };
+    }
+  }
+
+  // ── Cas 2 : fallback via axe de piste ───────────────────────────────────
+  // On projette l'obstacle sur l'axe de piste pour trouver :
+  //   - la distance PERPENDICULAIRE à l'axe (distance latérale)
+  //   - l'altitude de la piste au point projeté (interpolée entre les deux seuils)
+  //   - on soustrait la demi-largeur de bande (75 m) pour obtenir la distance
+  //     au bord de la bande.
+  const STRIP_HALF_WIDTH = 75; // mètres, demi-largeur typique bande (code 3/4)
+  let bestResult = null;
+
+  App.runways.forEach(r => {
+    if (r.thresholdLat == null || r.thresholdLon == null || !r.reciprocal) return;
+    const opp = App.runways.find(op => op.designation === r.reciprocal);
+    if (!opp || opp.thresholdLat == null || opp.thresholdLon == null) return;
+
+    // Axe de piste entre les deux seuils
+    const axeLine = turf.lineString([
+      [r.thresholdLon, r.thresholdLat],
+      [opp.thresholdLon, opp.thresholdLat],
+    ]);
+
+    // Distance totale de l'obstacle à l'axe (perpendiculaire)
+    const distToAxis = turf.pointToLineDistance(pt, axeLine, { units: 'meters' });
+    const distPerp = Math.max(0, distToAxis - STRIP_HALF_WIDTH);
+
+    // Projection du point sur l'axe → fraction le long de la piste
+    const snapped = turf.nearestPointOnLine(axeLine, pt, { units: 'meters' });
+    const runwayLen = turf.length(axeLine, { units: 'meters' });
+    const frac = runwayLen > 0 ? snapped.properties.location / runwayLen : 0.5;
+
+    // Altitude interpolée de la piste au point projeté
+    const fracClamped = Math.max(0, Math.min(1, frac));
+    const altStartM = (r.elevation || 0) * 0.3048;
+    const altEndM = (opp.elevation || 0) * 0.3048;
+    const altInterpolM = altStartM + fracClamped * (altEndM - altStartM);
+
+    if (bestResult == null || distPerp < bestResult.distM) {
+      bestResult = { distM: distPerp, altBaseM: altInterpolM, fracAlongRunway: frac };
     }
   });
-  return minDist;
+
+  return bestResult;
+}
+
+/** 
+ * Trouve la distance minimale à la bande de piste (usage général,
+ * conservé pour compatibilité avec les autres surfaces).
+ */
+function getClosestRunwayStripDist(lat, lon) {
+  const info = getTransitionStripInfo(lat, lon);
+  return info ? info.distM : null;
 }
 
 /**
@@ -209,10 +282,11 @@ function computeAdmissibleAltitude(lat, lon, obs) {
           let inner = (seuil.dist * seuil.dist) - Math.pow(altAdRefM + hobsM - altobsM, 2);
           if (inner < 0) inner = 0;
           const dSlanted = Math.sqrt(inner);
-          
+
           if (type.startsWith('decollage')) {
             const d = Math.max(0, dSlanted - 60);
-            sommetM = 2 * altAdRefM - seuil.altM + 0.02 * d;
+            // sommetM = 2 * altAdRefM - seuil.altM + 0.02 * d;
+            sommetM = altAdRefM + 0.02 * d;
           } else {
             let pente = 0.02;
             let d_i = Math.max(0, dSlanted - 60);
@@ -223,24 +297,33 @@ function computeAdmissibleAltitude(lat, lon, obs) {
               pente = 0;
               d_i = Math.max(0, dSlanted - 6660);
             }
-            sommetM = 2 * altAdRefM - seuil.altM + d_i * pente;
+            //sommetM = 2 * altAdRefM - seuil.altM + d_i * pente;
+            sommetM = altAdRefM + d_i * pente;
           }
         }
         dynamicTypesSeen.add(type);
       } else if ((type === 'transition' || type === 'transition_gauche' || type === 'transition_droite') && obs) {
-        const distBande = getClosestRunwayStripDist(lat, lon);
-        if (distBande != null) {
-          // Formule correcte : AltAdm = Alt_aérodrome + 45 - (pente × d)
-          // d = min(distancePoint_vers_limite_sup, limiteSup)
-          // La limite supérieure est la projection horizontale du bord supérieur
-          // de la surface de transition sur l'horizontale où elle s'appuie.
-          // limiteSup = 45 / pente = 45 / (1/7) ≈ 315 m depuis le bord de la bande
-          const pente = 1 / 7; // ≈ 0.14286
+        // 
+        //   AltAdm = Alt_axe_piste_au_point_le_plus_proche + d_perp × (1/7)
+        //
+        // où d_perp = distance perpendiculaire horizontale de l'obstacle
+        //             au bord latéral de la bande de piste.
+        //
+        // Reformulation équivalente (formule du schéma) :
+        //   AltAdm = Alt_aérodrome + 45 - (pente × d)
+        //   d = min(distancePoint_vers_limite_sup, limiteSup)
+        //   limiteSup ≈ 315 m (= 45 m / pente 1/7)
+        //
+        // Note : l'altitude de base est celle de la PISTE au point le plus
+        // proche (interpolée entre les deux seuils), pas l'altitude ARP fixe.
+        const stripInfo = getTransitionStripInfo(lat, lon);
+        if (stripInfo != null) {
+          const pente = 1 / 7; // pente 14.3 % (code 3 & 4, précision)
           const limiteSup = 45 / pente; // ≈ 315 m
-          // d = distance horizontale de l'obstacle vers la limite supérieure
-          const distToUpperLimit = Math.max(0, limiteSup - distBande);
-          const d = Math.min(distToUpperLimit, limiteSup);
-          sommetM = altAdRefM + 45 - (pente * d);
+          const d = Math.min(stripInfo.distM, limiteSup);
+          // AltAdm = altBase + d × pente
+          // (≡ altBase + 45 - pente × (limiteSup - d))
+          sommetM = stripInfo.altBaseM + d * pente;
         }
         dynamicTypesSeen.add(type);
       }
@@ -253,6 +336,43 @@ function computeAdmissibleAltitude(lat, lon, obs) {
       // Géométrie invalide — ignorée silencieusement pour ne pas bloquer l'affichage
     }
   });
+
+  // ── Check géométrique SURFACE DE TRANSITION ─────────────────────────────────
+  // Réalisé INDÉPENDAMMENT du polygone backend pour pallier les cas où
+  // le polygone est mal positionné ou trop étroit (le backend peut générer
+  // la surface de transition sans tenir compte de la zone réelle).
+  // Conditions d'application :
+  //   1. L'obstacle est latéralement dans la zone de transition (0–315 m de la bande)
+  //   2. L'obstacle est longitudinalement à côté de la piste (fraction [-0.05, 1.05])
+  // Si la surface de transition a déjà été ajoutée par le polygone backend,
+  // cette entrée supplémentaire sera également prise en compte dans le min().
+  if (typeof turf !== 'undefined') {
+    try {
+      const PENTE_TRANS = 1 / 7;
+      const LIMITE_SUP_M = 45 / PENTE_TRANS; // ≈ 315 m
+      // Tolérance longitudinale : la surface de transition s'étend
+      // au-delà des seuils de quelques mètres (bande = seuil ± 60 m)
+      const FRINGE = 0.10; // 10 % de longueur de piste au-delà des seuils
+
+      const stripInfo = getTransitionStripInfo(lat, lon);
+      if (
+        stripInfo != null &&
+        stripInfo.distM >= 0 &&
+        stripInfo.distM <= LIMITE_SUP_M &&
+        stripInfo.fracAlongRunway >= -FRINGE &&
+        stripInfo.fracAlongRunway <= 1 + FRINGE
+      ) {
+        const d = Math.min(stripInfo.distM, LIMITE_SUP_M);
+        const transitionSommetM = stripInfo.altBaseM + d * PENTE_TRANS;
+        covering.push({
+          label: 'Transition (géométrie)',
+          sommetM: transitionSommetM,
+        });
+      }
+    } catch (e) {
+      // Géométrie invalide — ignorée silencieusement
+    }
+  }
 
   if (!covering.length) {
     return { admissibleM: null, coveringSurfaces: [], horsSurfaces: true };
