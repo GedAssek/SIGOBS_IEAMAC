@@ -201,7 +201,6 @@ function selectRunway(rwy) {
 
   const meta = document.getElementById('runway-meta');
   meta.innerHTML =
-    `<span class="runway-meta-item">CAP <span>${rwy.trueHeading ?? '—'}°</span></span>` +
     `<span class="runway-meta-item">L <span>${rwy.length ?? '—'} m</span></span>` +
     `<span class="runway-meta-item">l <span>${rwy.width ?? '—'} m</span></span>` +
     `<span class="runway-meta-item">ÉLÉV <span>${rwy.elevation != null ? (rwy.elevation * 0.3048).toFixed(1) : '—'} m</span></span>`;

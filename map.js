@@ -53,6 +53,10 @@ function geoMapInit() {
     GeoMap.map.addControl(
       new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left'
     );
+    // Contrôle plein écran
+    GeoMap.map.addControl(
+      new maplibregl.FullscreenControl(), 'top-right'
+    );
 
     GeoMap.map.on('load', () => {
       if (emptyEl) emptyEl.style.display = 'none';

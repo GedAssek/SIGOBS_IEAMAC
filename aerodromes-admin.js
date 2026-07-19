@@ -60,30 +60,9 @@ async function loadAllAerodromes() {
    N'apparaît que si plus d'un aérodrome est accessible.
 ══════════════════════════════════════════════════════════ */
 function renderAerodromeSwitcher() {
-  const infoRow = document.querySelector('#study-aerodrome-display .study-aerodrome-info');
-  if (!infoRow) return;
-
-  const list = App.aerodromesList || [];
+  // Désactivé à la demande de l'utilisateur pour gagner de la place dans la topbar
   const existingSelect = document.getElementById('aerodrome-switcher-select');
-
-  if (list.length <= 1) {
-    if (existingSelect) existingSelect.remove();
-    return;
-  }
-
-  let select = existingSelect;
-  if (!select) {
-    select = document.createElement('select');
-    select.id = 'aerodrome-switcher-select';
-    select.className = 'field-select';
-    select.style.cssText = 'width:150px;margin-left:6px;font-size:12.5px;padding:3px 6px;';
-    select.onchange = () => switchAerodrome(select.value);
-    infoRow.appendChild(select);
-  }
-  select.innerHTML = list.map(a =>
-    `<option value="${a._id}">${a.code_oaci || a.icao || '—'} — ${(a.nom || a.name || '').slice(0, 22)}</option>`
-  ).join('');
-  select.value = App.currentAerodromeId || '';
+  if (existingSelect) existingSelect.remove();
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -179,14 +158,34 @@ function renderAerodromesAdminList() {
       <div class="runway-mgmt-actions">
         ${!isCurrent ? `<button class="action-btn" onclick="switchAerodrome('${id}')">SÉLECTIONNER</button>` : ''}
         <button class="action-btn" onclick="openEditAerodromeModal('${id}')">ÉDITER</button>
-        ${isAdmin ? `<button class="action-btn" onclick="openGrantAccessModal('${id}','${(a.code_oaci || a.icao || '').replace(/'/g, "\\'")}')">GÉRER LES ACCÈS</button>` : ''}
+        ${isAdmin ? `<button class="action-btn" onclick="openGrantAccessModal('${id}','${(a.code_oaci || a.icao || '').replace(/'/g, "\\'")}')">GÉRER LES ACCÈS</button>
+                     <button class="action-btn delete" onclick="confirmDeleteAerodrome('${id}', '${(a.code_oaci || a.icao || '').replace(/'/g, "\\'")}')" title="Supprimer">✕</button>` : ''}
       </div>
     </div>`;
   }).join('');
 }
 
-function confirmDeleteAerodrome(id, icao) {
-  showToast("La suppression d'un aérodrome n'est pas supportée par l'API.", 'warn');
+async function confirmDeleteAerodrome(id, icao) {
+  if (!confirm(`Voulez-vous vraiment supprimer l'aérodrome ${icao} ? Cette action est irréversible.`)) return;
+
+  try {
+    await apiFetch(`/aerodromes/${id}`, 'DELETE');
+    showToast(`Aérodrome ${icao} supprimé avec succès`, 'success');
+    if (App.currentAerodromeId === id) {
+      App.currentAerodromeId = null;
+      sessionStorage.removeItem('sigobs_aerodrome_id');
+      // Reset study info in UI
+      const icaoEl = document.getElementById('study-icao');
+      if (icaoEl) icaoEl.textContent = '—';
+      const nameEl = document.getElementById('study-name');
+      if (nameEl) nameEl.textContent = 'Sélectionnez un aérodrome';
+      const dotEl = document.getElementById('study-status-dot');
+      if (dotEl) dotEl.className = 'study-status-dot missing';
+    }
+    await loadAerodromesAdminList();
+  } catch (e) {
+    showToast('Erreur lors de la suppression : ' + e.message, 'error');
+  }
 }
 
 function openEditAerodromeModal(id) {
@@ -352,8 +351,15 @@ async function openGrantAccessModal(aerodromeId, icao) {
 
   // 1. Filtrer les utilisateurs qui ont DÉJÀ accès (soit comme aerodrome principal, soit dans le tableau)
   const usersWithAccess = users.filter(u => {
-    const isMain = typeof u.aerodrome_id === 'object' ? u.aerodrome_id?._id === aerodromeId : u.aerodrome_id === aerodromeId;
-    const isAuthorized = Array.isArray(u.aerodromes_autorises) && u.aerodromes_autorises.includes(aerodromeId);
+    const mainId = typeof u.aerodrome_id === 'object' && u.aerodrome_id !== null ? u.aerodrome_id._id : u.aerodrome_id;
+    const isMain = mainId === aerodromeId;
+    
+    const aeroArray = Array.isArray(u.aerodromes) ? u.aerodromes : (Array.isArray(u.aerodromes_autorises) ? u.aerodromes_autorises : []);
+    const isAuthorized = aeroArray.some(a => {
+       const aId = typeof a === 'object' && a !== null ? a._id || a.id : a;
+       return aId === aerodromeId;
+    });
+
     return isMain || isAuthorized;
   });
 

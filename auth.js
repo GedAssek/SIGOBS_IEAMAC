@@ -314,10 +314,18 @@ async function handleChangePassword() {
   btn.disabled = true;
 
   try {
-    await apiFetch('/auth/change-password', 'PUT', {
+    const res = await apiFetch('/auth/change-password', 'PUT', {
       oldPassword: current,
-      newPassword:     newPwd,
+      newPassword: newPwd,
     });
+    if (res.data && res.data.token) {
+      App.token = res.data.token;
+      sessionStorage.setItem('sigobs_token', App.token);
+      if (App.user) {
+        App.user.mustChangePassword = false;
+        sessionStorage.setItem('sigobs_user', JSON.stringify(App.user));
+      }
+    }
     succEl.textContent = 'Mot de passe modifié avec succès !';
     succEl.classList.remove('hidden');
     document.getElementById('cp-current-password').value    = '';

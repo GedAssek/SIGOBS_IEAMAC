@@ -63,6 +63,8 @@ async function submitRunway() {
   const lonProlDegage = parseFloat(document.getElementById('rwy-add-prol-degage')?.value) || undefined;
   const largBordAm = parseFloat(document.getElementById('rwy-add-bord-am')?.value) || undefined;
   const largBordDeg = parseFloat(document.getElementById('rwy-add-bord-deg')?.value) || undefined;
+  const bandeLongueur = parseFloat(document.getElementById('rwy-add-bande-longueur')?.value);
+  const bandeLargeur = parseFloat(document.getElementById('rwy-add-bande-largeur')?.value);
 
   // Types d'approche (cases à cocher)
   const typesApproche = [];
@@ -89,6 +91,7 @@ async function submitRunway() {
       { type: 'Point', coordinates: [s1Lon, s1Lat], qfu_associe: qfu1, altitude: s1Alt },
       { type: 'Point', coordinates: [s2Lon, s2Lat], qfu_associe: qfu2, altitude: s2Alt },
     ],
+    ...(!isNaN(bandeLongueur) && !isNaN(bandeLargeur) ? { bande: { longueur: bandeLongueur, largeur: bandeLargeur } } : {}),
     ...(typesApproche.length ? { types_approche: typesApproche } : {}),
     ...(typesDecollage.length ? { types_decollage: typesDecollage } : {}),
     ...(lonProlArret !== undefined ? { longueur_prolongement_arret: lonProlArret } : {}),
@@ -148,7 +151,6 @@ function renderRunwaysManagementList() {
     <div class="runway-mgmt-item">
       <div class="runway-mgmt-header">
         <span class="runway-mgmt-desig">RWY ${rwy.designation || '—'}</span>
-        <span class="runway-meta-item">CAP <span>${rwy.trueHeading ?? '—'}°</span></span>
         <span class="runway-meta-item">L <span>${rwy.length ?? '—'} m</span></span>
         <span class="runway-meta-item">l <span>${rwy.width ?? '—'} m</span></span>
         <span class="runway-meta-item">ÉLÉV <span>${rwy.elevation != null ? (rwy.elevation * 0.3048).toFixed(1) : '—'} m</span></span>
@@ -258,6 +260,14 @@ async function openEditRunwayModal(id) {
        <div class="field-group" style="grid-column:1/-1;">
          <label class="field-label">CODE RÉFÉRENCE OACI</label>
          <input type="text" id="erwy-code-ref" class="field-input" value="${piste.code_reference || ''}" placeholder="ex: 4E" />
+       </div>
+       <div class="field-group" style="grid-column:1/-1;">
+         <label class="field-label">BANDE DE PISTE (L × l en m)</label>
+         <div class="dms-row" style="gap:10px;">
+           <input type="number" id="erwy-bande-longueur" class="field-input" value="${piste.bande?.longueur || ''}" placeholder="L (m)" style="width:120px;" />
+           <span class="dms-unit">×</span>
+           <input type="number" id="erwy-bande-largeur" class="field-input" value="${piste.bande?.largeur || ''}" placeholder="l (m)" style="width:120px;" />
+         </div>
        </div>
 
        <div class="field-group" style="grid-column:1/-1;">
@@ -435,6 +445,8 @@ async function submitEditRunway(id, qfu1Orig, qfu2Orig) {
   const lonProlDegage = parseFloat(document.getElementById('erwy-prol-degage')?.value);
   const largBordAm    = parseFloat(document.getElementById('erwy-bord-am')?.value);
   const largBordDeg   = parseFloat(document.getElementById('erwy-bord-deg')?.value);
+  const bandeLongueur = parseFloat(document.getElementById('erwy-bande-longueur')?.value);
+  const bandeLargeur  = parseFloat(document.getElementById('erwy-bande-largeur')?.value);
 
   const patch = {
     qfu_1: qfu1,
@@ -446,6 +458,7 @@ async function submitEditRunway(id, qfu1Orig, qfu2Orig) {
       { type: 'Point', coordinates: [s1Lon, s1Lat], qfu_associe: qfu1, altitude: s1AltFt },
       { type: 'Point', coordinates: [s2Lon, s2Lat], qfu_associe: qfu2, altitude: s2AltFt },
     ],
+    ...(!isNaN(bandeLongueur) && !isNaN(bandeLargeur) ? { bande: { longueur: bandeLongueur, largeur: bandeLargeur } } : {}),
     ...(typesApproche.length ? { types_approche: typesApproche } : {}),
     ...(typesDecollage.length ? { types_decollage: typesDecollage } : {}),
     ...(!isNaN(lonProlArret)  ? { longueur_prolongement_arret: lonProlArret }  : {}),
@@ -461,7 +474,8 @@ async function submitEditRunway(id, qfu1Orig, qfu2Orig) {
 function clearRunwayForm() {
   [
     'rwy-add-qfu1', 'rwy-add-qfu2', 'rwy-add-longueur', 'rwy-add-largeur',
-    'rwy-add-code-ref', 'rwy-add-prol-arret', 'rwy-add-prol-degage',
+    'rwy-add-code-ref', 'rwy-add-bande-longueur', 'rwy-add-bande-largeur',
+    'rwy-add-prol-arret', 'rwy-add-prol-degage',
     'rwy-add-bord-am', 'rwy-add-bord-deg',
     'rwy-seuil1-alt', 'rwy-seuil2-alt',
     'rwy-s1-lat-deg', 'rwy-s1-lat-min', 'rwy-s1-lat-sec',

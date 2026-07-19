@@ -191,7 +191,7 @@
         <!-- CENTER PANEL — Carte MapLibre 3D géoréférencée (agrandie) -->
         <main class="panel panel-center" id="map3d-panel">
           <div class="panel-header">
-            <span class="panel-title">CARTE SATELLITE 3D — SURFACES OLS GÉORÉFÉRENCÉES</span>
+            <span class="panel-title">CARTE 3D — SURFACES OLS</span>
             <div class="panel-actions">
               <span id="active-runway-label" class="active-runway">— Aucune piste —</span>
               <div class="map3d-controls">
@@ -793,6 +793,14 @@
             <div class="field-group">
               <label class="field-label">CODE RÉFÉRENCE OACI</label>
               <input id="rwy-add-code-ref" type="text" class="field-input" placeholder="ex: 4E" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">BANDE DE PISTE (L × l en m)</label>
+              <div class="dms-row">
+                <input id="rwy-add-bande-longueur" type="number" class="field-input" placeholder="L (m)" />
+                <span class="dms-unit">×</span>
+                <input id="rwy-add-bande-largeur" type="number" class="field-input" placeholder="l (m)" />
+              </div>
             </div>
 
             <div class="coord-section" style="margin-top:10px;">

@@ -98,7 +98,17 @@ function renderUsersList(users) {
       if (cached) roleLabel = cached.nomRole || cached.name;
       else roleLabel = roleRef;
     }
-    const aeroLabel = u.aerodrome_id?.code_oaci || u.aerodrome_id?.nom || '—';
+    let aeroLabel = '—';
+    const aeroArray = Array.isArray(u.aerodromes) ? u.aerodromes : (Array.isArray(u.aerodromes_autorises) ? u.aerodromes_autorises : null);
+    if (aeroArray && aeroArray.length > 0) {
+      aeroLabel = aeroArray.map(a => {
+        if (typeof a === 'object') return a.code_oaci || a.icao || a.nom || 'Inconnu';
+        const aero = App.aerodromesList?.find(aer => aer._id === a || aer.id === a);
+        return aero ? (aero.code_oaci || aero.icao || aero.nom || 'Inconnu') : 'Inconnu';
+      }).join(', ');
+    } else if (u.aerodrome_id) {
+      aeroLabel = u.aerodrome_id.code_oaci || u.aerodrome_id.nom || '—';
+    }
     const emailSafe = (u.email || '').replace(/'/g, "\\'");
     return `<tr>
       <td style="font-weight:600;">${u.email || '—'}</td>
