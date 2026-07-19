@@ -157,7 +157,8 @@ function renderRunwaysManagementList() {
       </div>
       <div class="runway-mgmt-actions">
         ${rwy.typesApproche?.length ? rwy.typesApproche.map(t => `<span class="tag tag-info">${t}</span>`).join('') : '<span class="tag tag-info" style="opacity:0.6;">Approche non définie</span>'}
-        ${rwy._id ? `<button class="action-btn" onclick="openEditRunwayModal('${rwy._id}')">ÉDITER</button>` : ''}
+        ${rwy._id ? `<button class="action-btn" onclick="openEditRunwayModal('${rwy._id}')">ÉDITER</button>
+                     <button class="action-btn delete" onclick="confirmDeleteRunway('${rwy._id}', '${rwy.designation || ''}')" title="Supprimer">✕</button>` : ''}
       </div>
     </div>
   `).join('');
@@ -526,7 +527,20 @@ function clearRunwayForm() {
   });
 }
 
-/** Confirmation de suppression d'une piste (si l'API le supporte) */
-function confirmDeleteRunway(id, designation) {
-  showToast("La suppression d'une piste n'est pas supportée par l'API.", 'warn');
+/** Confirmation de suppression d'une piste */
+async function confirmDeleteRunway(id, designation) {
+  if (!confirm(`Voulez-vous vraiment supprimer la piste ${designation} (et son QFU opposé) ? Cette action est irréversible.`)) return;
+
+  try {
+    await apiFetch(`/pistes/${id}`, 'DELETE');
+    showToast(`Piste supprimée avec succès`, 'success');
+    
+    // Recharge l'aérodrome pour rafraîchir la liste des pistes
+    if (typeof loadAerodromeById === 'function' && App.currentAerodromeId) {
+      await loadAerodromeById(App.currentAerodromeId);
+    }
+  } catch (err) {
+    console.error('[confirmDeleteRunway]', err);
+    showToast("Erreur lors de la suppression de la piste : " + err.message, 'error');
+  }
 }
