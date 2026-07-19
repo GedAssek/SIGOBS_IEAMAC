@@ -795,11 +795,11 @@
               <input id="rwy-add-code-ref" type="text" class="field-input" placeholder="ex: 4E" />
             </div>
             <div class="field-group">
-              <label class="field-label">BANDE DE PISTE (L × l en m)</label>
+              <label class="field-label">BANDE DE PISTE </label>
               <div class="dms-row">
-                <input id="rwy-add-bande-longueur" type="number" class="field-input" placeholder="L (m)" />
+                <input id="rwy-add-bande-longueur" type="number" class="field-input" placeholder="Longueur (m)" />
                 <span class="dms-unit">×</span>
-                <input id="rwy-add-bande-largeur" type="number" class="field-input" placeholder="l (m)" />
+                <input id="rwy-add-bande-largeur" type="number" class="field-input" placeholder="largeur (m)" />
               </div>
             </div>
 
@@ -837,6 +837,14 @@
               </div>
               <input id="rwy-seuil1-alt" type="number" class="field-input" placeholder="Altitude (m)"
                 style="margin-top:4px;" />
+              <div class="field-group" style="margin-top:8px;">
+                <label class="field-label">TYPES D'APPROCHE (SEUIL 1)</label>
+                <div style="display:flex; gap:10px;">
+                  <label class="toggle-label"><input type="checkbox" id="rwy-s1-approche-vue" /> Vue</label>
+                  <label class="toggle-label"><input type="checkbox" id="rwy-s1-approche-classique" /> Classique</label>
+                  <label class="toggle-label"><input type="checkbox" id="rwy-s1-approche-precision" /> Précision</label>
+                </div>
+              </div>
             </div>
             <div class="coord-section" style="margin-top:10px;">
               <span class="coord-label">COORDONNÉES SEUIL 2</span>
@@ -872,20 +880,21 @@
               </div>
               <input id="rwy-seuil2-alt" type="number" class="field-input" placeholder="Altitude (m)"
                 style="margin-top:4px;" />
+              <div class="field-group" style="margin-top:8px;">
+                <label class="field-label">TYPES D'APPROCHE (SEUIL 2)</label>
+                <div style="display:flex; gap:10px;">
+                  <label class="toggle-label"><input type="checkbox" id="rwy-s2-approche-vue" /> Vue</label>
+                  <label class="toggle-label"><input type="checkbox" id="rwy-s2-approche-classique" /> Classique</label>
+                  <label class="toggle-label"><input type="checkbox" id="rwy-s2-approche-precision" /> Précision</label>
+                </div>
+              </div>
             </div>
 
-            <div class="field-group" style="margin-top:10px;">
-              <label class="field-label">TYPES D'APPROCHE (QFU 1/2)</label>
-              <label class="toggle-label"><input type="checkbox" id="rwy-approche-vue" /> Vue</label>
-              <label class="toggle-label"><input type="checkbox" id="rwy-approche-classique" /> Classique</label>
-              <label class="toggle-label"><input type="checkbox" id="rwy-approche-precision" /> Précision</label>
-            </div>
             <div class="field-group" style="margin-top:10px;">
               <label class="field-label">TYPES DE DÉCOLLAGE (QFU 1/2)</label>
               <label class="toggle-label"><input type="checkbox" id="rwy-decollage-odp" /> ODP</label>
               <label class="toggle-label"><input type="checkbox" id="rwy-decollage-sid" /> SID</label>
-              <label class="toggle-label"><input type="checkbox" id="rwy-decollage-omnidirectionnel" />
-                Omnidirectionnel</label>
+              <label class="toggle-label"><input type="checkbox" id="rwy-decollage-omnidirectionnel" /> Omnidirectionnel</label>
             </div>
 
             <button class="btn-primary btn-full" onclick="submitRunway()" style="margin-top:15px;">
@@ -1054,8 +1063,10 @@
             </div>
             <div class="field-group" style="margin-top:5px;">
               <label class="field-label">AÉRODROMES ASSOCIÉS</label>
-              <input type="text" id="user-aero-search" class="field-input" placeholder="Rechercher (ex: DXXX)..." oninput="filterUserAerodromes()" />
-              <div id="user-aero-checkboxes" style="max-height:140px; overflow-y:auto; border:1px solid rgba(148, 163, 184, 0.3); border-radius:var(--radius-sm); padding:8px; margin-top:4px; display:flex; flex-direction:column; gap:6px; background:var(--bg-input);">
+              <input type="text" id="user-aero-search" class="field-input" placeholder="Rechercher (ex: DXXX)..."
+                oninput="filterUserAerodromes()" />
+              <div id="user-aero-checkboxes"
+                style="max-height:140px; overflow-y:auto; border:1px solid rgba(148, 163, 184, 0.3); border-radius:var(--radius-sm); padding:8px; margin-top:4px; display:flex; flex-direction:column; gap:6px; background:var(--bg-input);">
                 <div class="empty-msg" style="font-size:11px;">Chargement...</div>
               </div>
             </div>

@@ -3552,6 +3552,10 @@ body {
     grid-template-columns: 240px 1fr 230px;
   }
 
+  .app-layout-analyse {
+    grid-template-columns: 1fr 260px;
+  }
+
   /* Réduire la topbar */
   .tab-btn {
     font-size: 11.5px;

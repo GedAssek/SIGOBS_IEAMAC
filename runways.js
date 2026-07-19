@@ -66,12 +66,15 @@ async function submitRunway() {
   const bandeLongueur = parseFloat(document.getElementById('rwy-add-bande-longueur')?.value);
   const bandeLargeur = parseFloat(document.getElementById('rwy-add-bande-largeur')?.value);
 
-  // Types d'approche (cases à cocher)
-  const typesApproche = [];
+  // Types d'approche (fusion des sélections Seuil 1 et Seuil 2)
+  const typesApproche = new Set();
   ['Vue', 'Classique', 'Precision'].forEach(t => {
-    const cb = document.getElementById(`rwy-approche-${t.toLowerCase()}`);
-    if (cb && cb.checked) typesApproche.push(t);
+    const cbS1 = document.getElementById(`rwy-s1-approche-${t.toLowerCase()}`);
+    const cbS2 = document.getElementById(`rwy-s2-approche-${t.toLowerCase()}`);
+    if (cbS1 && cbS1.checked) typesApproche.add(t);
+    if (cbS2 && cbS2.checked) typesApproche.add(t);
   });
+  const typesApprocheArr = Array.from(typesApproche);
 
   // Types de décollage (cases à cocher)
   const typesDecollage = [];
@@ -92,7 +95,7 @@ async function submitRunway() {
       { type: 'Point', coordinates: [s2Lon, s2Lat], qfu_associe: qfu2, altitude: s2Alt },
     ],
     ...(!isNaN(bandeLongueur) && !isNaN(bandeLargeur) ? { bande: { longueur: bandeLongueur, largeur: bandeLargeur } } : {}),
-    ...(typesApproche.length ? { types_approche: typesApproche } : {}),
+    ...(typesApprocheArr.length ? { types_approche: typesApprocheArr } : {}),
     ...(typesDecollage.length ? { types_decollage: typesDecollage } : {}),
     ...(lonProlArret !== undefined ? { longueur_prolongement_arret: lonProlArret } : {}),
     ...(lonProlDegage !== undefined ? { longueur_prolongement_degage: lonProlDegage } : {}),
@@ -262,22 +265,15 @@ async function openEditRunwayModal(id) {
          <input type="text" id="erwy-code-ref" class="field-input" value="${piste.code_reference || ''}" placeholder="ex: 4E" />
        </div>
        <div class="field-group" style="grid-column:1/-1;">
-         <label class="field-label">BANDE DE PISTE (L × l en m)</label>
+         <label class="field-label">BANDE DE PISTE </label>
          <div class="dms-row" style="gap:10px;">
-           <input type="number" id="erwy-bande-longueur" class="field-input" value="${piste.bande?.longueur || ''}" placeholder="L (m)" style="width:120px;" />
+           <input type="number" id="erwy-bande-longueur" class="field-input" value="${piste.bande?.longueur || ''}" placeholder="Longueur (m)" style="width:120px;" />
            <span class="dms-unit">×</span>
-           <input type="number" id="erwy-bande-largeur" class="field-input" value="${piste.bande?.largeur || ''}" placeholder="l (m)" style="width:120px;" />
+           <input type="number" id="erwy-bande-largeur" class="field-input" value="${piste.bande?.largeur || ''}" placeholder="largeur (m)" style="width:120px;" />
          </div>
        </div>
 
-       <div class="field-group" style="grid-column:1/-1;">
-         <label class="field-label">TYPES D'APPROCHE</label>
-         <div style="display:flex;gap:10px;flex-wrap:wrap;">
-           ${mkChk('erwy-approche-vue', 'Vue', approcheBD)}
-           ${mkChk('erwy-approche-classique', 'Classique', approcheBD)}
-           ${mkChk('erwy-approche-precision', 'Precision', approcheBD)}
-         </div>
-       </div>
+
        <div class="field-group" style="grid-column:1/-1;">
          <label class="field-label">TYPES DE DÉCOLLAGE</label>
          <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -321,11 +317,19 @@ async function openEditRunwayModal(id) {
              </div>
            </div>
          </div>
-         <div class="field-group" style="margin-top:6px;">
-           <label class="field-label" style="font-size:10px;">ALTITUDE SEUIL 1 (m)</label>
-           <input type="number" id="erwy-s1-alt-m" class="field-input" value="${s1AltM}" placeholder="Altitude (m)" step="0.1" style="width:140px;" />
-         </div>
-       </div>
+          <div class="field-group" style="margin-top:6px;">
+            <label class="field-label" style="font-size:10px;">ALTITUDE SEUIL 1 (m)</label>
+            <input type="number" id="erwy-s1-alt-m" class="field-input" value="${s1AltM}" placeholder="Altitude (m)" step="0.1" style="width:140px;" />
+          </div>
+          <div class="field-group" style="margin-top:6px;">
+            <label class="field-label" style="font-size:10px;">TYPES D'APPROCHE (SEUIL 1)</label>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              ${mkChk('erwy-s1-approche-vue', 'Vue', approcheBD)}
+              ${mkChk('erwy-s1-approche-classique', 'Classique', approcheBD)}
+              ${mkChk('erwy-s1-approche-precision', 'Precision', approcheBD)}
+            </div>
+          </div>
+        </div>
 
        <div class="field-group" style="grid-column:1/-1; border-top:1px solid var(--border); padding-top:8px;">
          <label class="field-label">SEUIL 2 (${piste.qfu_2 || 'QFU2'}) — COORDONNÉES</label>
@@ -356,7 +360,8 @@ async function openEditRunwayModal(id) {
                <span class="dms-unit">"</span>
                <select id="erwy-s2-lon-hem" class="field-select dms-hem">
                  <option value="E" ${s2LonP.hem === 'E' ? 'selected' : ''}>E</option>
-                 <option value="W" ${s2LonP.hem === 'W' ? 'selected' : ''}>W</option>
+                 <option value="E" ${s2LatP.hem === 'E' ? 'selected' : ''}>E</option>
+                 <option value="W" ${s2LatP.hem === 'W' ? 'selected' : ''}>W</option>
                </select>
              </div>
            </div>
@@ -365,6 +370,14 @@ async function openEditRunwayModal(id) {
            <label class="field-label" style="font-size:10px;">ALTITUDE SEUIL 2 (m)</label>
            <input type="number" id="erwy-s2-alt-m" class="field-input" value="${s2AltM}" placeholder="Altitude (m)" step="0.1" style="width:140px;" />
          </div>
+          <div class="field-group" style="margin-top:6px;">
+            <label class="field-label" style="font-size:10px;">TYPES D'APPROCHE (SEUIL 2)</label>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              ${mkChk('erwy-s2-approche-vue', 'Vue', approcheBD)}
+              ${mkChk('erwy-s2-approche-classique', 'Classique', approcheBD)}
+              ${mkChk('erwy-s2-approche-precision', 'Precision', approcheBD)}
+            </div>
+          </div>
        </div>
 
        <div class="field-group">
@@ -428,11 +441,15 @@ async function submitEditRunway(id, qfu1Orig, qfu2Orig) {
   const s2AltM = parseFloat(document.getElementById('erwy-s2-alt-m')?.value) || 0;
   const s2AltFt = Math.round(s2AltM * M_TO_FT * 100) / 100;
 
-  // Types d'approche
-  const typesApproche = ['Vue', 'Classique', 'Precision'].filter(t => {
-    const cb = document.getElementById(`erwy-approche-${t.toLowerCase()}`);
-    return cb && cb.checked;
+  // Types d'approche (fusion Seuil 1 et Seuil 2)
+  const typesApprocheSet = new Set();
+  ['Vue', 'Classique', 'Precision'].forEach(t => {
+    const cbS1 = document.getElementById(`erwy-s1-approche-${t.toLowerCase()}`);
+    const cbS2 = document.getElementById(`erwy-s2-approche-${t.toLowerCase()}`);
+    if (cbS1 && cbS1.checked) typesApprocheSet.add(t);
+    if (cbS2 && cbS2.checked) typesApprocheSet.add(t);
   });
+  const typesApproche = Array.from(typesApprocheSet);
 
   // Types de décollage
   const typesDecollage = ['ODP', 'SID', 'Omnidirectionnel'].filter(t => {

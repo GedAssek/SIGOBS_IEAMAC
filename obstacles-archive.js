@@ -74,40 +74,77 @@ const TEMPORALITY_LABELS = {
 function summarizeEventDiff(ev) {
   const before = ev.anciennes_valeurs || {};
   const after = ev.nouvelles_valeurs || {};
-  const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])];
-  if (!keys.length) return '';
-  return keys.slice(0, 3).map(k => {
-    const b = before[k], a = after[k];
-    if (a === undefined) return `${k} supprimé`;
-    if (b === undefined) return `${k} : ${JSON.stringify(a)}`;
-    return `${k} : ${JSON.stringify(b)} → ${JSON.stringify(a)}`;
-  }).join(' · ') + (keys.length > 3 ? ` (+${keys.length - 3})` : '');
+  const allKeys = [...new Set([...Object.keys(before), ...Object.keys(after)])];
+  
+  // 1. Filtrer pour ne garder que ce qui a réellement changé
+  let changedKeys = allKeys.filter(k => JSON.stringify(before[k]) !== JSON.stringify(after[k]));
+  
+  if (ev.type_action === 'CREATE' || Object.keys(before).length === 0) {
+    return 'Création initiale';
+  }
+  if (ev.type_action === 'DELETE') {
+    return 'Document supprimé';
+  }
+
+  // 2. Ignorer les champs techniques non user-friendly
+  const ignore = ['_id', '__v', 'createdAt', 'updatedAt', 'aerodrome_id', 'is_deleted'];
+  changedKeys = changedKeys.filter(k => !ignore.includes(k));
+
+  if (!changedKeys.length) return 'Aucune modification visible';
+
+  return changedKeys.slice(0, 3).map(k => {
+    let b = before[k], a = after[k];
+    
+    // Résolution d'ID pour piste_id
+    if (k === 'piste_id') {
+      const rb = App.runways?.find(r => r._id === b);
+      const ra = App.runways?.find(r => r._id === a);
+      if (rb) b = `${rb.qfu1 || rb.qfu_1 || ''}/${rb.qfu2 || rb.qfu_2 || ''}`;
+      if (ra) a = `${ra.qfu1 || ra.qfu_1 || ''}/${ra.qfu2 || ra.qfu_2 || ''}`;
+    }
+
+    if (a === undefined || a === null || a === '') return `${k} effacé`;
+    if (b === undefined || b === null || b === '') return `${k} renseigné`;
+    
+    // Simplifier les gros objets (comme géométrie)
+    if (typeof b === 'object' || typeof a === 'object') {
+       return `${k} modifié`;
+    }
+    
+    return `${k} : ${b} → ${a}`;
+  }).join(' · ') + (changedKeys.length > 3 ? ` (+${changedKeys.length - 3})` : '');
 }
 
 /** Retrouve un nom lisible pour le document concerné par l'événement */
 function resolveEventObjectName(ev) {
+  const docObj = (ev.document_id && typeof ev.document_id === 'object') ? ev.document_id : { _id: ev.document_id };
+  const docId = docObj._id;
+  
   if (ev.collection_impactee === 'Obstacle') {
-    const obs = App.allObstacles?.find(o => o._id === ev.document_id);
-    return obs?.name || ev.document_id;
+    const obs = App.allObstacles?.find(o => o._id === docId);
+    return obs?.name || docObj.nom || docId;
   }
   if (ev.collection_impactee === 'Aerodrome') {
-    return App.aerodrome?.icao || App.aerodrome?.name || ev.document_id;
+    return App.aerodrome?.icao || App.aerodrome?.name || docObj.nom || docId;
   }
   if (ev.collection_impactee === 'Piste') {
-    const rwy = App.runways?.find(r => r._id === ev.document_id);
-    return rwy ? `${rwy.qfu1 || ''}/${rwy.qfu2 || ''}` : ev.document_id;
+    const rwy = App.runways?.find(r => r._id === docId);
+    return rwy ? `${rwy.qfu1 || ''}/${rwy.qfu2 || ''}` : (docObj.nom || docId);
   }
-  return ev.document_id;
+  return docObj.nom || docId;
 }
 
 /** Détermine si un événement backend concerne l'aérodrome courant */
 function eventBelongsToCurrentAerodrome(ev) {
-  if (ev.collection_impactee === 'Aerodrome') return ev.document_id === App.aerodromeMongoId;
+  const docId = (ev.document_id && typeof ev.document_id === 'object') ? ev.document_id._id : ev.document_id;
+  if (!docId) return false;
+
+  if (ev.collection_impactee === 'Aerodrome') return docId === App.aerodromeMongoId;
   if (ev.collection_impactee === 'Obstacle') {
-    return (App.allObstacles || []).some(o => o._id === ev.document_id);
+    return (App.allObstacles || []).some(o => o._id === docId);
   }
   if (ev.collection_impactee === 'Piste') {
-    return (App.runways || []).some(r => r._id === ev.document_id);
+    return (App.runways || []).some(r => r._id === docId);
   }
   return false; // autres collections (Utilisateur, Role...) hors périmètre de cet onglet
 }
