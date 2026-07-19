@@ -338,7 +338,7 @@ async function openEditRunwayModal(id) {
           <div style="margin-top:12px; padding:10px; background:rgba(0,0,0,0.02); border:1px solid var(--border-light); border-radius:6px;">
             <label class="field-label" style="margin-bottom:8px; display:block;">PROLONGEMENTS (m)</label>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-              <div class="field-group">
+              <div class="field-group" style="grid-column:1 / -1;">
                 <label class="field-label" style="font-size:9px; color:var(--text-muted);">LONGUEUR ARRÊT</label>
                 <input type="number" id="erwy-s1-prol-arret" class="field-input" value="${lonProlArretS1}" placeholder="Optionnel" />
               </div>
@@ -346,7 +346,7 @@ async function openEditRunwayModal(id) {
                 <label class="field-label" style="font-size:9px; color:var(--text-muted);">LONGUEUR DÉGAGÉ</label>
                 <input type="number" id="erwy-s1-prol-degage" class="field-input" value="${lonProlDegageS1}" placeholder="Optionnel" />
               </div>
-              <div class="field-group" style="grid-column:1 / -1;">
+              <div class="field-group">
                 <label class="field-label" style="font-size:9px; color:var(--text-muted);">LARGEUR DÉGAGÉ</label>
                 <input type="number" id="erwy-s1-larg-prol-degage" class="field-input" value="${largProlDegageS1}" placeholder="Optionnel" />
               </div>
@@ -411,7 +411,7 @@ async function openEditRunwayModal(id) {
           <div style="margin-top:12px; padding:10px; background:rgba(0,0,0,0.02); border:1px solid var(--border-light); border-radius:6px;">
             <label class="field-label" style="margin-bottom:8px; display:block;">PROLONGEMENTS (m)</label>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-              <div class="field-group">
+              <div class="field-group" style="grid-column:1 / -1;">
                 <label class="field-label" style="font-size:9px; color:var(--text-muted);">LONGUEUR ARRÊT</label>
                 <input type="number" id="erwy-s2-prol-arret" class="field-input" value="${lonProlArretS2}" placeholder="Optionnel" />
               </div>
@@ -419,7 +419,7 @@ async function openEditRunwayModal(id) {
                 <label class="field-label" style="font-size:9px; color:var(--text-muted);">LONGUEUR DÉGAGÉ</label>
                 <input type="number" id="erwy-s2-prol-degage" class="field-input" value="${lonProlDegageS2}" placeholder="Optionnel" />
               </div>
-              <div class="field-group" style="grid-column:1 / -1;">
+              <div class="field-group">
                 <label class="field-label" style="font-size:9px; color:var(--text-muted);">LARGEUR DÉGAGÉ</label>
                 <input type="number" id="erwy-s2-larg-prol-degage" class="field-input" value="${largProlDegageS2}" placeholder="Optionnel" />
               </div>
