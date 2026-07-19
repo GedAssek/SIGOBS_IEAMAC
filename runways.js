@@ -66,22 +66,13 @@ async function submitRunway() {
   const bandeLongueur = parseFloat(document.getElementById('rwy-add-bande-longueur')?.value);
   const bandeLargeur = parseFloat(document.getElementById('rwy-add-bande-largeur')?.value);
 
-  // Types d'approche (fusion des sélections Seuil 1 et Seuil 2)
-  const typesApproche = new Set();
-  ['Vue', 'Classique', 'Precision'].forEach(t => {
-    const cbS1 = document.getElementById(`rwy-s1-approche-${t.toLowerCase()}`);
-    const cbS2 = document.getElementById(`rwy-s2-approche-${t.toLowerCase()}`);
-    if (cbS1 && cbS1.checked) typesApproche.add(t);
-    if (cbS2 && cbS2.checked) typesApproche.add(t);
-  });
-  const typesApprocheArr = Array.from(typesApproche);
+  // Types d'approche et décollage (Seuil 1)
+  const typesApprocheS1 = ['Vue', 'Classique', 'Precision'].filter(t => document.getElementById(`rwy-s1-approche-${t.toLowerCase()}`)?.checked);
+  const typesDecollageS1 = ['ODP', 'SID', 'Omnidirectionnel'].filter(t => document.getElementById(`rwy-s1-decollage-${t.toLowerCase()}`)?.checked);
 
-  // Types de décollage (cases à cocher)
-  const typesDecollage = [];
-  ['ODP', 'SID', 'Omnidirectionnel'].forEach(t => {
-    const cb = document.getElementById(`rwy-decollage-${t.toLowerCase()}`);
-    if (cb && cb.checked) typesDecollage.push(t);
-  });
+  // Types d'approche et décollage (Seuil 2)
+  const typesApprocheS2 = ['Vue', 'Classique', 'Precision'].filter(t => document.getElementById(`rwy-s2-approche-${t.toLowerCase()}`)?.checked);
+  const typesDecollageS2 = ['ODP', 'SID', 'Omnidirectionnel'].filter(t => document.getElementById(`rwy-s2-decollage-${t.toLowerCase()}`)?.checked);
 
   // Construction du payload conforme à la doc §6.4
   const payload = {
@@ -91,12 +82,18 @@ async function submitRunway() {
     largeur,
     code_reference: codeRef,
     seuils: [
-      { type: 'Point', coordinates: [s1Lon, s1Lat], qfu_associe: qfu1, altitude: s1Alt },
-      { type: 'Point', coordinates: [s2Lon, s2Lat], qfu_associe: qfu2, altitude: s2Alt },
+      { 
+        type: 'Point', coordinates: [s1Lon, s1Lat], qfu_associe: qfu1, altitude: s1Alt,
+        ...(typesApprocheS1.length ? { types_approche: typesApprocheS1 } : {}),
+        ...(typesDecollageS1.length ? { types_decollage: typesDecollageS1 } : {})
+      },
+      { 
+        type: 'Point', coordinates: [s2Lon, s2Lat], qfu_associe: qfu2, altitude: s2Alt,
+        ...(typesApprocheS2.length ? { types_approche: typesApprocheS2 } : {}),
+        ...(typesDecollageS2.length ? { types_decollage: typesDecollageS2 } : {})
+      },
     ],
     ...(!isNaN(bandeLongueur) && !isNaN(bandeLargeur) ? { bande: { longueur: bandeLongueur, largeur: bandeLargeur } } : {}),
-    ...(typesApprocheArr.length ? { types_approche: typesApprocheArr } : {}),
-    ...(typesDecollage.length ? { types_decollage: typesDecollage } : {}),
     ...(lonProlArret !== undefined ? { longueur_prolongement_arret: lonProlArret } : {}),
     ...(lonProlDegage !== undefined ? { longueur_prolongement_degage: lonProlDegage } : {}),
     ...(largBordAm !== undefined ? { largeur_bord_amenage: largBordAm } : {}),
@@ -159,8 +156,7 @@ function renderRunwaysManagementList() {
         <span class="runway-meta-item">ÉLÉV <span>${rwy.elevation != null ? (rwy.elevation * 0.3048).toFixed(1) : '—'} m</span></span>
       </div>
       <div class="runway-mgmt-actions">
-        <span class="tag tag-info">OACI ${rwy.icaoCode || '—'}</span>
-        ${rwy.typesApproche?.length ? `<span class="tag tag-pass">${rwy.typesApproche.join(', ')}</span>` : ''}
+        ${rwy.typesApproche?.length ? rwy.typesApproche.map(t => `<span class="tag tag-info">${t}</span>`).join('') : '<span class="tag tag-info" style="opacity:0.6;">Approche non définie</span>'}
         ${rwy._id ? `<button class="action-btn" onclick="openEditRunwayModal('${rwy._id}')">ÉDITER</button>` : ''}
       </div>
     </div>
@@ -228,9 +224,11 @@ async function openEditRunwayModal(id) {
   const s1LatP = toDmsParts(s1Lat, 'lat'), s1LonP = toDmsParts(s1Lon, 'lon');
   const s2LatP = toDmsParts(s2Lat, 'lat'), s2LonP = toDmsParts(s2Lon, 'lon');
 
-  // Types d'approche et de décollage (valeurs en base)
-  const approcheBD = piste.types_approche || [];
-  const decollageBD = piste.types_decollage || [];
+  // Types d'approche et de décollage (valeurs en base, fallback sur piste pour compatibilité)
+  const approcheBDS1 = seuil1.types_approche || piste.types_approche || [];
+  const decollageBDS1 = seuil1.types_decollage || piste.types_decollage || [];
+  const approcheBDS2 = seuil2.types_approche || piste.types_approche || [];
+  const decollageBDS2 = seuil2.types_decollage || piste.types_decollage || [];
 
   const mkChk = (cbId, val, arr) =>
     `<label class="toggle-label"><input type="checkbox" id="${cbId}" ${arr.includes(val) ? 'checked' : ''} /> ${val}</label>`;
@@ -274,14 +272,7 @@ async function openEditRunwayModal(id) {
        </div>
 
 
-       <div class="field-group" style="grid-column:1/-1;">
-         <label class="field-label">TYPES DE DÉCOLLAGE</label>
-         <div style="display:flex;gap:10px;flex-wrap:wrap;">
-           ${mkChk('erwy-decollage-odp', 'ODP', decollageBD)}
-           ${mkChk('erwy-decollage-sid', 'SID', decollageBD)}
-           ${mkChk('erwy-decollage-omni', 'Omnidirectionnel', decollageBD)}
-         </div>
-       </div>
+
 
        <div class="field-group" style="grid-column:1/-1; border-top:1px solid var(--border); padding-top:8px;">
          <label class="field-label">SEUIL 1 (${piste.qfu_1 || 'QFU1'}) — COORDONNÉES</label>
@@ -324,9 +315,17 @@ async function openEditRunwayModal(id) {
           <div class="field-group" style="margin-top:6px;">
             <label class="field-label" style="font-size:10px;">TYPES D'APPROCHE (SEUIL 1)</label>
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
-              ${mkChk('erwy-s1-approche-vue', 'Vue', approcheBD)}
-              ${mkChk('erwy-s1-approche-classique', 'Classique', approcheBD)}
-              ${mkChk('erwy-s1-approche-precision', 'Precision', approcheBD)}
+              ${mkChk('erwy-s1-approche-vue', 'Vue', approcheBDS1)}
+              ${mkChk('erwy-s1-approche-classique', 'Classique', approcheBDS1)}
+              ${mkChk('erwy-s1-approche-precision', 'Precision', approcheBDS1)}
+            </div>
+          </div>
+          <div class="field-group" style="margin-top:6px;">
+            <label class="field-label" style="font-size:10px;">TYPES DE DÉCOLLAGE (SEUIL 1)</label>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              ${mkChk('erwy-s1-decollage-odp', 'ODP', decollageBDS1)}
+              ${mkChk('erwy-s1-decollage-sid', 'SID', decollageBDS1)}
+              ${mkChk('erwy-s1-decollage-omni', 'Omnidirectionnel', decollageBDS1)}
             </div>
           </div>
         </div>
@@ -360,8 +359,7 @@ async function openEditRunwayModal(id) {
                <span class="dms-unit">"</span>
                <select id="erwy-s2-lon-hem" class="field-select dms-hem">
                  <option value="E" ${s2LonP.hem === 'E' ? 'selected' : ''}>E</option>
-                 <option value="E" ${s2LatP.hem === 'E' ? 'selected' : ''}>E</option>
-                 <option value="W" ${s2LatP.hem === 'W' ? 'selected' : ''}>W</option>
+                 <option value="W" ${s2LonP.hem === 'W' ? 'selected' : ''}>W</option>
                </select>
              </div>
            </div>
@@ -373,9 +371,17 @@ async function openEditRunwayModal(id) {
           <div class="field-group" style="margin-top:6px;">
             <label class="field-label" style="font-size:10px;">TYPES D'APPROCHE (SEUIL 2)</label>
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
-              ${mkChk('erwy-s2-approche-vue', 'Vue', approcheBD)}
-              ${mkChk('erwy-s2-approche-classique', 'Classique', approcheBD)}
-              ${mkChk('erwy-s2-approche-precision', 'Precision', approcheBD)}
+              ${mkChk('erwy-s2-approche-vue', 'Vue', approcheBDS2)}
+              ${mkChk('erwy-s2-approche-classique', 'Classique', approcheBDS2)}
+              ${mkChk('erwy-s2-approche-precision', 'Precision', approcheBDS2)}
+            </div>
+          </div>
+          <div class="field-group" style="margin-top:6px;">
+            <label class="field-label" style="font-size:10px;">TYPES DE DÉCOLLAGE (SEUIL 2)</label>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              ${mkChk('erwy-s2-decollage-odp', 'ODP', decollageBDS2)}
+              ${mkChk('erwy-s2-decollage-sid', 'SID', decollageBDS2)}
+              ${mkChk('erwy-s2-decollage-omni', 'Omnidirectionnel', decollageBDS2)}
             </div>
           </div>
        </div>
@@ -441,21 +447,18 @@ async function submitEditRunway(id, qfu1Orig, qfu2Orig) {
   const s2AltM = parseFloat(document.getElementById('erwy-s2-alt-m')?.value) || 0;
   const s2AltFt = Math.round(s2AltM * M_TO_FT * 100) / 100;
 
-  // Types d'approche (fusion Seuil 1 et Seuil 2)
-  const typesApprocheSet = new Set();
-  ['Vue', 'Classique', 'Precision'].forEach(t => {
-    const cbS1 = document.getElementById(`erwy-s1-approche-${t.toLowerCase()}`);
-    const cbS2 = document.getElementById(`erwy-s2-approche-${t.toLowerCase()}`);
-    if (cbS1 && cbS1.checked) typesApprocheSet.add(t);
-    if (cbS2 && cbS2.checked) typesApprocheSet.add(t);
+  // Types d'approche et décollage (Seuil 1)
+  const typesApprocheS1 = ['Vue', 'Classique', 'Precision'].filter(t => document.getElementById(`erwy-s1-approche-${t.toLowerCase()}`)?.checked);
+  const typesDecollageS1 = ['ODP', 'SID', 'Omnidirectionnel'].filter(t => {
+    const cbId = t === 'Omnidirectionnel' ? 'erwy-s1-decollage-omni' : `erwy-s1-decollage-${t.toLowerCase()}`;
+    return document.getElementById(cbId)?.checked;
   });
-  const typesApproche = Array.from(typesApprocheSet);
 
-  // Types de décollage
-  const typesDecollage = ['ODP', 'SID', 'Omnidirectionnel'].filter(t => {
-    const cbId = t === 'Omnidirectionnel' ? 'erwy-decollage-omni' : `erwy-decollage-${t.toLowerCase()}`;
-    const cb = document.getElementById(cbId);
-    return cb && cb.checked;
+  // Types d'approche et décollage (Seuil 2)
+  const typesApprocheS2 = ['Vue', 'Classique', 'Precision'].filter(t => document.getElementById(`erwy-s2-approche-${t.toLowerCase()}`)?.checked);
+  const typesDecollageS2 = ['ODP', 'SID', 'Omnidirectionnel'].filter(t => {
+    const cbId = t === 'Omnidirectionnel' ? 'erwy-s2-decollage-omni' : `erwy-s2-decollage-${t.toLowerCase()}`;
+    return document.getElementById(cbId)?.checked;
   });
 
   const lonProlArret  = parseFloat(document.getElementById('erwy-prol-arret')?.value);
@@ -472,12 +475,18 @@ async function submitEditRunway(id, qfu1Orig, qfu2Orig) {
     largeur,
     ...(codeRef ? { code_reference: codeRef } : {}),
     seuils: [
-      { type: 'Point', coordinates: [s1Lon, s1Lat], qfu_associe: qfu1, altitude: s1AltFt },
-      { type: 'Point', coordinates: [s2Lon, s2Lat], qfu_associe: qfu2, altitude: s2AltFt },
+      { 
+        type: 'Point', coordinates: [s1Lon, s1Lat], qfu_associe: qfu1, altitude: s1AltFt,
+        ...(typesApprocheS1.length ? { types_approche: typesApprocheS1 } : {}),
+        ...(typesDecollageS1.length ? { types_decollage: typesDecollageS1 } : {})
+      },
+      { 
+        type: 'Point', coordinates: [s2Lon, s2Lat], qfu_associe: qfu2, altitude: s2AltFt,
+        ...(typesApprocheS2.length ? { types_approche: typesApprocheS2 } : {}),
+        ...(typesDecollageS2.length ? { types_decollage: typesDecollageS2 } : {})
+      },
     ],
     ...(!isNaN(bandeLongueur) && !isNaN(bandeLargeur) ? { bande: { longueur: bandeLongueur, largeur: bandeLargeur } } : {}),
-    ...(typesApproche.length ? { types_approche: typesApproche } : {}),
-    ...(typesDecollage.length ? { types_decollage: typesDecollage } : {}),
     ...(!isNaN(lonProlArret)  ? { longueur_prolongement_arret: lonProlArret }  : {}),
     ...(!isNaN(lonProlDegage) ? { longueur_prolongement_degage: lonProlDegage } : {}),
     ...(!isNaN(largBordAm)    ? { largeur_bord_amenage: largBordAm }    : {}),
@@ -504,12 +513,16 @@ function clearRunwayForm() {
     if (el) el.value = '';
   });
   ['Vue', 'Classique', 'Precision'].forEach(t => {
-    const cb = document.getElementById(`rwy-approche-${t.toLowerCase()}`);
-    if (cb) cb.checked = false;
+    const cbS1 = document.getElementById(`rwy-s1-approche-${t.toLowerCase()}`);
+    const cbS2 = document.getElementById(`rwy-s2-approche-${t.toLowerCase()}`);
+    if (cbS1) cbS1.checked = false;
+    if (cbS2) cbS2.checked = false;
   });
   ['ODP', 'SID', 'Omnidirectionnel'].forEach(t => {
-    const cb = document.getElementById(`rwy-decollage-${t.toLowerCase()}`);
-    if (cb) cb.checked = false;
+    const cbS1 = document.getElementById(`rwy-s1-decollage-${t.toLowerCase()}`);
+    const cbS2 = document.getElementById(`rwy-s2-decollage-${t.toLowerCase()}`);
+    if (cbS1) cbS1.checked = false;
+    if (cbS2) cbS2.checked = false;
   });
 }
 

@@ -845,6 +845,14 @@
                   <label class="toggle-label"><input type="checkbox" id="rwy-s1-approche-precision" /> Précision</label>
                 </div>
               </div>
+              <div class="field-group" style="margin-top:8px;">
+                <label class="field-label">TYPES DE DÉCOLLAGE (SEUIL 1)</label>
+                <div style="display:flex; gap:10px;">
+                  <label class="toggle-label"><input type="checkbox" id="rwy-s1-decollage-odp" /> ODP</label>
+                  <label class="toggle-label"><input type="checkbox" id="rwy-s1-decollage-sid" /> SID</label>
+                  <label class="toggle-label"><input type="checkbox" id="rwy-s1-decollage-omnidirectionnel" /> Omnidirectionnel</label>
+                </div>
+              </div>
             </div>
             <div class="coord-section" style="margin-top:10px;">
               <span class="coord-label">COORDONNÉES SEUIL 2</span>
@@ -888,13 +896,14 @@
                   <label class="toggle-label"><input type="checkbox" id="rwy-s2-approche-precision" /> Précision</label>
                 </div>
               </div>
-            </div>
-
-            <div class="field-group" style="margin-top:10px;">
-              <label class="field-label">TYPES DE DÉCOLLAGE (QFU 1/2)</label>
-              <label class="toggle-label"><input type="checkbox" id="rwy-decollage-odp" /> ODP</label>
-              <label class="toggle-label"><input type="checkbox" id="rwy-decollage-sid" /> SID</label>
-              <label class="toggle-label"><input type="checkbox" id="rwy-decollage-omnidirectionnel" /> Omnidirectionnel</label>
+              <div class="field-group" style="margin-top:8px;">
+                <label class="field-label">TYPES DE DÉCOLLAGE (SEUIL 2)</label>
+                <div style="display:flex; gap:10px;">
+                  <label class="toggle-label"><input type="checkbox" id="rwy-s2-decollage-odp" /> ODP</label>
+                  <label class="toggle-label"><input type="checkbox" id="rwy-s2-decollage-sid" /> SID</label>
+                  <label class="toggle-label"><input type="checkbox" id="rwy-s2-decollage-omnidirectionnel" /> Omnidirectionnel</label>
+                </div>
+              </div>
             </div>
 
             <button class="btn-primary btn-full" onclick="submitRunway()" style="margin-top:15px;">

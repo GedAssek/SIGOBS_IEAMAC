@@ -67,7 +67,6 @@ function normalizeAerodromeFromAPI(raw, pistesRaw) {
       width: p.largeur || 45,
       closed: p.fermee || false,
       icaoCode: p.code_reference ? parseInt(p.code_reference[0]) || 4 : 4,
-      typesApproche: p.types_approche || [],
     };
     if (p.qfu_1 && seuil1 && !runwaysFull.find(r => r.designation === p.qfu_1)) {
       runwaysFull.push(Object.assign({}, base, {
@@ -77,6 +76,7 @@ function normalizeAerodromeFromAPI(raw, pistesRaw) {
         elevation: seuil1.altitude !== undefined ? seuil1.altitude : (raw.altitude || 0),
         thresholdLat: seuil1.coordinates ? seuil1.coordinates[1] : lat,
         thresholdLon: seuil1.coordinates ? seuil1.coordinates[0] : lon,
+        typesApproche: seuil1.types_approche || p.types_approche || [],
       }));
     }
     if (p.qfu_2 && seuil2 && !runwaysFull.find(r => r.designation === p.qfu_2)) {
@@ -88,6 +88,7 @@ function normalizeAerodromeFromAPI(raw, pistesRaw) {
         elevation: seuil2.altitude !== undefined ? seuil2.altitude : (raw.altitude || 0),
         thresholdLat: seuil2.coordinates ? seuil2.coordinates[1] : lat,
         thresholdLon: seuil2.coordinates ? seuil2.coordinates[0] : lon,
+        typesApproche: seuil2.types_approche || p.types_approche || [],
       }));
     }
   });
