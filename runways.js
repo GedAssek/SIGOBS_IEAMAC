@@ -58,23 +58,24 @@ async function submitRunway() {
     return;
   }
 
-  // Champs optionnels
-  const lonProlArret = parseFloat(document.getElementById('rwy-add-prol-arret')?.value) || undefined;
-  const lonProlDegage = parseFloat(document.getElementById('rwy-add-prol-degage')?.value) || undefined;
-  const largBordAm = parseFloat(document.getElementById('rwy-add-bord-am')?.value) || undefined;
-  const largBordDeg = parseFloat(document.getElementById('rwy-add-bord-deg')?.value) || undefined;
   const bandeLongueur = parseFloat(document.getElementById('rwy-add-bande-longueur')?.value);
   const bandeLargeur = parseFloat(document.getElementById('rwy-add-bande-largeur')?.value);
 
-  // Types d'approche et décollage (Seuil 1)
+  // Types et champs optionnels (Seuil 1)
   const typesApprocheS1 = ['Vue', 'Classique', 'Precision'].filter(t => document.getElementById(`rwy-s1-approche-${t.toLowerCase()}`)?.checked);
   const typesDecollageS1 = ['ODP', 'SID', 'Omnidirectionnel'].filter(t => document.getElementById(`rwy-s1-decollage-${t.toLowerCase()}`)?.checked);
+  const prolArretS1 = parseFloat(document.getElementById('rwy-s1-prol-arret')?.value);
+  const prolDegageS1 = parseFloat(document.getElementById('rwy-s1-prol-degage')?.value);
+  const largProlDegageS1 = parseFloat(document.getElementById('rwy-s1-larg-prol-degage')?.value);
 
-  // Types d'approche et décollage (Seuil 2)
+  // Types et champs optionnels (Seuil 2)
   const typesApprocheS2 = ['Vue', 'Classique', 'Precision'].filter(t => document.getElementById(`rwy-s2-approche-${t.toLowerCase()}`)?.checked);
   const typesDecollageS2 = ['ODP', 'SID', 'Omnidirectionnel'].filter(t => document.getElementById(`rwy-s2-decollage-${t.toLowerCase()}`)?.checked);
+  const prolArretS2 = parseFloat(document.getElementById('rwy-s2-prol-arret')?.value);
+  const prolDegageS2 = parseFloat(document.getElementById('rwy-s2-prol-degage')?.value);
+  const largProlDegageS2 = parseFloat(document.getElementById('rwy-s2-larg-prol-degage')?.value);
 
-  // Construction du payload conforme à la doc §6.4
+  // Construction du payload conforme à la doc §6.4 (adaptée)
   const payload = {
     qfu_1: qfu1,
     qfu_2: qfu2,
@@ -85,19 +86,21 @@ async function submitRunway() {
       { 
         type: 'Point', coordinates: [s1Lon, s1Lat], qfu_associe: qfu1, altitude: s1Alt,
         ...(typesApprocheS1.length ? { types_approche: typesApprocheS1 } : {}),
-        ...(typesDecollageS1.length ? { types_decollage: typesDecollageS1 } : {})
+        ...(typesDecollageS1.length ? { types_decollage: typesDecollageS1 } : {}),
+        ...(!isNaN(prolArretS1) ? { longueur_prolongement_arret: prolArretS1 } : {}),
+        ...(!isNaN(prolDegageS1) ? { longueur_prolongement_degage: prolDegageS1 } : {}),
+        ...(!isNaN(largProlDegageS1) ? { largeur_prolongement_degage: largProlDegageS1 } : {})
       },
       { 
         type: 'Point', coordinates: [s2Lon, s2Lat], qfu_associe: qfu2, altitude: s2Alt,
         ...(typesApprocheS2.length ? { types_approche: typesApprocheS2 } : {}),
-        ...(typesDecollageS2.length ? { types_decollage: typesDecollageS2 } : {})
+        ...(typesDecollageS2.length ? { types_decollage: typesDecollageS2 } : {}),
+        ...(!isNaN(prolArretS2) ? { longueur_prolongement_arret: prolArretS2 } : {}),
+        ...(!isNaN(prolDegageS2) ? { longueur_prolongement_degage: prolDegageS2 } : {}),
+        ...(!isNaN(largProlDegageS2) ? { largeur_prolongement_degage: largProlDegageS2 } : {})
       },
     ],
-    ...(!isNaN(bandeLongueur) && !isNaN(bandeLargeur) ? { bande: { longueur: bandeLongueur, largeur: bandeLargeur } } : {}),
-    ...(lonProlArret !== undefined ? { longueur_prolongement_arret: lonProlArret } : {}),
-    ...(lonProlDegage !== undefined ? { longueur_prolongement_degage: lonProlDegage } : {}),
-    ...(largBordAm !== undefined ? { largeur_bord_amenage: largBordAm } : {}),
-    ...(largBordDeg !== undefined ? { largeur_bord_degage: largBordDeg } : {}),
+    ...(!isNaN(bandeLongueur) && !isNaN(bandeLargeur) ? { bande: { longueur: bandeLongueur, largeur: bandeLargeur } } : {})
   };
 
   try {
@@ -234,10 +237,13 @@ async function openEditRunwayModal(id) {
   const mkChk = (cbId, val, arr) =>
     `<label class="toggle-label"><input type="checkbox" id="${cbId}" ${arr.includes(val) ? 'checked' : ''} /> ${val}</label>`;
 
-  const lonProlArret = piste.longueur_prolongement_arret != null ? piste.longueur_prolongement_arret : '';
-  const lonProlDegage = piste.longueur_prolongement_degage != null ? piste.longueur_prolongement_degage : '';
-  const largBordAm = piste.largeur_bord_amenage != null ? piste.largeur_bord_amenage : '';
-  const largBordDeg = piste.largeur_bord_degage != null ? piste.largeur_bord_degage : '';
+  const lonProlArretS1 = seuil1.longueur_prolongement_arret != null ? seuil1.longueur_prolongement_arret : (piste.longueur_prolongement_arret != null ? piste.longueur_prolongement_arret : '');
+  const lonProlDegageS1 = seuil1.longueur_prolongement_degage != null ? seuil1.longueur_prolongement_degage : (piste.longueur_prolongement_degage != null ? piste.longueur_prolongement_degage : '');
+  const largProlDegageS1 = seuil1.largeur_prolongement_degage != null ? seuil1.largeur_prolongement_degage : (piste.largeur_prolongement_degage != null ? piste.largeur_prolongement_degage : '');
+
+  const lonProlArretS2 = seuil2.longueur_prolongement_arret != null ? seuil2.longueur_prolongement_arret : (piste.longueur_prolongement_arret != null ? piste.longueur_prolongement_arret : '');
+  const lonProlDegageS2 = seuil2.longueur_prolongement_degage != null ? seuil2.longueur_prolongement_degage : (piste.longueur_prolongement_degage != null ? piste.longueur_prolongement_degage : '');
+  const largProlDegageS2 = seuil2.largeur_prolongement_degage != null ? seuil2.largeur_prolongement_degage : (piste.largeur_prolongement_degage != null ? piste.largeur_prolongement_degage : '');
 
   showModal(
     `Éditer la piste ${piste.qfu_1 || ''}/${piste.qfu_2 || ''}`,
@@ -329,6 +335,23 @@ async function openEditRunwayModal(id) {
               ${mkChk('erwy-s1-decollage-omni', 'Omnidirectionnel', decollageBDS1)}
             </div>
           </div>
+          <div style="margin-top:12px; padding:10px; background:rgba(0,0,0,0.02); border:1px solid var(--border-light); border-radius:6px;">
+            <label class="field-label" style="margin-bottom:8px; display:block;">PROLONGEMENTS (m)</label>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+              <div class="field-group">
+                <label class="field-label" style="font-size:9px; color:var(--text-muted);">LONGUEUR ARRÊT</label>
+                <input type="number" id="erwy-s1-prol-arret" class="field-input" value="${lonProlArretS1}" placeholder="Optionnel" />
+              </div>
+              <div class="field-group">
+                <label class="field-label" style="font-size:9px; color:var(--text-muted);">LONGUEUR DÉGAGÉ</label>
+                <input type="number" id="erwy-s1-prol-degage" class="field-input" value="${lonProlDegageS1}" placeholder="Optionnel" />
+              </div>
+              <div class="field-group" style="grid-column:1 / -1;">
+                <label class="field-label" style="font-size:9px; color:var(--text-muted);">LARGEUR DÉGAGÉ</label>
+                <input type="number" id="erwy-s1-larg-prol-degage" class="field-input" value="${largProlDegageS1}" placeholder="Optionnel" />
+              </div>
+            </div>
+          </div>
         </div>
 
        <div class="field-group" style="grid-column:1/-1; border-top:1px solid var(--border); padding-top:8px;">
@@ -385,23 +408,23 @@ async function openEditRunwayModal(id) {
               ${mkChk('erwy-s2-decollage-omni', 'Omnidirectionnel', decollageBDS2)}
             </div>
           </div>
-       </div>
-
-       <div class="field-group">
-         <label class="field-label">PROLONGEMENT D'ARRÊT (m)</label>
-         <input type="number" id="erwy-prol-arret" class="field-input" value="${lonProlArret}" placeholder="Optionnel" />
-       </div>
-       <div class="field-group">
-         <label class="field-label">PROLONGEMENT DÉGAGÉ (m)</label>
-         <input type="number" id="erwy-prol-degage" class="field-input" value="${lonProlDegage}" placeholder="Optionnel" />
-       </div>
-       <div class="field-group">
-         <label class="field-label">LARGEUR BORD AMÉNAGÉ (m)</label>
-         <input type="number" id="erwy-bord-am" class="field-input" value="${largBordAm}" placeholder="Optionnel" />
-       </div>
-       <div class="field-group">
-         <label class="field-label">LARGEUR BORD DÉGAGÉ (m)</label>
-         <input type="number" id="erwy-bord-deg" class="field-input" value="${largBordDeg}" placeholder="Optionnel" />
+          <div style="margin-top:12px; padding:10px; background:rgba(0,0,0,0.02); border:1px solid var(--border-light); border-radius:6px;">
+            <label class="field-label" style="margin-bottom:8px; display:block;">PROLONGEMENTS (m)</label>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+              <div class="field-group">
+                <label class="field-label" style="font-size:9px; color:var(--text-muted);">LONGUEUR ARRÊT</label>
+                <input type="number" id="erwy-s2-prol-arret" class="field-input" value="${lonProlArretS2}" placeholder="Optionnel" />
+              </div>
+              <div class="field-group">
+                <label class="field-label" style="font-size:9px; color:var(--text-muted);">LONGUEUR DÉGAGÉ</label>
+                <input type="number" id="erwy-s2-prol-degage" class="field-input" value="${lonProlDegageS2}" placeholder="Optionnel" />
+              </div>
+              <div class="field-group" style="grid-column:1 / -1;">
+                <label class="field-label" style="font-size:9px; color:var(--text-muted);">LARGEUR DÉGAGÉ</label>
+                <input type="number" id="erwy-s2-larg-prol-degage" class="field-input" value="${largProlDegageS2}" placeholder="Optionnel" />
+              </div>
+            </div>
+          </div>
        </div>
      </div>`,
     async () => {
@@ -462,10 +485,14 @@ async function submitEditRunway(id, qfu1Orig, qfu2Orig) {
     return document.getElementById(cbId)?.checked;
   });
 
-  const lonProlArret  = parseFloat(document.getElementById('erwy-prol-arret')?.value);
-  const lonProlDegage = parseFloat(document.getElementById('erwy-prol-degage')?.value);
-  const largBordAm    = parseFloat(document.getElementById('erwy-bord-am')?.value);
-  const largBordDeg   = parseFloat(document.getElementById('erwy-bord-deg')?.value);
+  const prolArretS1 = parseFloat(document.getElementById('erwy-s1-prol-arret')?.value);
+  const prolDegageS1 = parseFloat(document.getElementById('erwy-s1-prol-degage')?.value);
+  const largProlDegageS1 = parseFloat(document.getElementById('erwy-s1-larg-prol-degage')?.value);
+
+  const prolArretS2 = parseFloat(document.getElementById('erwy-s2-prol-arret')?.value);
+  const prolDegageS2 = parseFloat(document.getElementById('erwy-s2-prol-degage')?.value);
+  const largProlDegageS2 = parseFloat(document.getElementById('erwy-s2-larg-prol-degage')?.value);
+
   const bandeLongueur = parseFloat(document.getElementById('erwy-bande-longueur')?.value);
   const bandeLargeur  = parseFloat(document.getElementById('erwy-bande-largeur')?.value);
 
@@ -479,19 +506,21 @@ async function submitEditRunway(id, qfu1Orig, qfu2Orig) {
       { 
         type: 'Point', coordinates: [s1Lon, s1Lat], qfu_associe: qfu1, altitude: s1AltFt,
         ...(typesApprocheS1.length ? { types_approche: typesApprocheS1 } : {}),
-        ...(typesDecollageS1.length ? { types_decollage: typesDecollageS1 } : {})
+        ...(typesDecollageS1.length ? { types_decollage: typesDecollageS1 } : {}),
+        ...(!isNaN(prolArretS1) ? { longueur_prolongement_arret: prolArretS1 } : {}),
+        ...(!isNaN(prolDegageS1) ? { longueur_prolongement_degage: prolDegageS1 } : {}),
+        ...(!isNaN(largProlDegageS1) ? { largeur_prolongement_degage: largProlDegageS1 } : {})
       },
       { 
         type: 'Point', coordinates: [s2Lon, s2Lat], qfu_associe: qfu2, altitude: s2AltFt,
         ...(typesApprocheS2.length ? { types_approche: typesApprocheS2 } : {}),
-        ...(typesDecollageS2.length ? { types_decollage: typesDecollageS2 } : {})
+        ...(typesDecollageS2.length ? { types_decollage: typesDecollageS2 } : {}),
+        ...(!isNaN(prolArretS2) ? { longueur_prolongement_arret: prolArretS2 } : {}),
+        ...(!isNaN(prolDegageS2) ? { longueur_prolongement_degage: prolDegageS2 } : {}),
+        ...(!isNaN(largProlDegageS2) ? { largeur_prolongement_degage: largProlDegageS2 } : {})
       },
     ],
-    ...(!isNaN(bandeLongueur) && !isNaN(bandeLargeur) ? { bande: { longueur: bandeLongueur, largeur: bandeLargeur } } : {}),
-    ...(!isNaN(lonProlArret)  ? { longueur_prolongement_arret: lonProlArret }  : {}),
-    ...(!isNaN(lonProlDegage) ? { longueur_prolongement_degage: lonProlDegage } : {}),
-    ...(!isNaN(largBordAm)    ? { largeur_bord_amenage: largBordAm }    : {}),
-    ...(!isNaN(largBordDeg)   ? { largeur_bord_degage: largBordDeg }   : {}),
+    ...(!isNaN(bandeLongueur) && !isNaN(bandeLargeur) ? { bande: { longueur: bandeLongueur, largeur: bandeLargeur } } : {})
   };
 
   await updateRunway(id, patch);
@@ -502,8 +531,8 @@ function clearRunwayForm() {
   [
     'rwy-add-qfu1', 'rwy-add-qfu2', 'rwy-add-longueur', 'rwy-add-largeur',
     'rwy-add-code-ref', 'rwy-add-bande-longueur', 'rwy-add-bande-largeur',
-    'rwy-add-prol-arret', 'rwy-add-prol-degage',
-    'rwy-add-bord-am', 'rwy-add-bord-deg',
+    'rwy-s1-prol-arret', 'rwy-s1-prol-degage', 'rwy-s1-larg-prol-degage',
+    'rwy-s2-prol-arret', 'rwy-s2-prol-degage', 'rwy-s2-larg-prol-degage',
     'rwy-seuil1-alt', 'rwy-seuil2-alt',
     'rwy-s1-lat-deg', 'rwy-s1-lat-min', 'rwy-s1-lat-sec',
     'rwy-s1-lon-deg', 'rwy-s1-lon-min', 'rwy-s1-lon-sec',

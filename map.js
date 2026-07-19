@@ -53,9 +53,11 @@ function geoMapInit() {
     GeoMap.map.addControl(
       new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left'
     );
-    // Contrôle plein écran
+    // Contrôle plein écran : on passe le panel complet pour que les légendes
+    // et boutons flottants restent visibles en plein écran.
+    const panel = document.getElementById('map3d-panel');
     GeoMap.map.addControl(
-      new maplibregl.FullscreenControl(), 'top-right'
+      new maplibregl.FullscreenControl({ container: panel }), 'top-right'
     );
 
     GeoMap.map.on('load', () => {
@@ -328,6 +330,4 @@ function map3dToggleLabels() {
 }
 
 /** Force un recalcul de la taille de la carte (utile lors du redimensionnement du panneau) */
-function map3dResize() {
-  if (GeoMap.map) GeoMap.map.resize();
-}
+

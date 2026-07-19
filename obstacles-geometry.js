@@ -258,9 +258,17 @@ function computeAdmissibleAltitude(lat, lon, obs) {
 
       const type = f.properties?.normalized_type;
 
-      // altitude admissible dynamique ne dépend pas de la tranche mais
-      // uniquement de la position de l'obstacle, on ne les compte qu'UNE
-      const dynamicTypes = ['horizontale_interieure', 'conique', 'approche', 'approche_troncon1', 'approche_troncon2', 'approche_troncon3', 'decollage', 'decollage_rect', 'transition', 'transition_gauche', 'transition_droite'];
+      // Chaque type ne contribue qu'une fois (deux polygones du même type
+      // pour deux extrémités de piste ne doivent pas compter double).
+      // On inclut bande_piste pour éviter la duplication "Bande Aménagée"
+      // lorsque le backend renvoie deux features (une par seuil).
+      const dynamicTypes = [
+        'bande_piste',
+        'horizontale_interieure', 'conique',
+        'approche', 'approche_troncon1', 'approche_troncon2', 'approche_troncon3',
+        'decollage', 'decollage_rect',
+        'transition', 'transition_gauche', 'transition_droite',
+      ];
       if (dynamicTypes.includes(type) && dynamicTypesSeen.has(type)) {
         return;
       }
@@ -326,10 +334,32 @@ function computeAdmissibleAltitude(lat, lon, obs) {
           sommetM = stripInfo.altBaseM + d * pente;
         }
         dynamicTypesSeen.add(type);
+      } else if (type === 'bande_piste') {
+        // Bande de piste : on utilise la valeur du backend telle quelle.
+        // On l'enregistre pour éviter d'ajouter deux fois la même bande
+        // (le backend peut renvoyer une feature par seuil de piste).
+        dynamicTypesSeen.add(type);
       }
 
+      // Choisir le bon label : certains backends renvoient "Bande aménagée" pour les
+      // surfaces de transition, on préfère le label basé sur le type normalisé.
+      const TYPE_LABELS = {
+        transition_gauche: 'Transition gauche',
+        transition_droite: 'Transition droite',
+        transition: 'Transition',
+        bande_piste: 'Bande de piste',
+        horizontale_interieure: 'Horizontale intérieure',
+        conique: 'Conique',
+        approche: 'Approche',
+        approche_troncon1: 'Approche tronçon 1',
+        approche_troncon2: 'Approche tronçon 2',
+        approche_troncon3: 'Approche tronçon 3',
+        decollage: 'Décollage',
+        decollage_rect: 'Décollage rect.',
+      };
+      const resolvedLabel = TYPE_LABELS[type] || f.properties?.label || f.properties?.type_surface || 'Surface';
       covering.push({
-        label: f.properties?.label || f.properties?.type_surface || 'Surface',
+        label: resolvedLabel,
         sommetM,
       });
     } catch (e) {
@@ -338,21 +368,22 @@ function computeAdmissibleAltitude(lat, lon, obs) {
   });
 
   // ── Check géométrique SURFACE DE TRANSITION ─────────────────────────────────
-  // Réalisé INDÉPENDAMMENT du polygone backend pour pallier les cas où
-  // le polygone est mal positionné ou trop étroit (le backend peut générer
-  // la surface de transition sans tenir compte de la zone réelle).
-  // Conditions d'application :
-  //   1. L'obstacle est latéralement dans la zone de transition (0–315 m de la bande)
-  //   2. L'obstacle est longitudinalement à côté de la piste (fraction [-0.05, 1.05])
-  // Si la surface de transition a déjà été ajoutée par le polygone backend,
-  // cette entrée supplémentaire sera également prise en compte dans le min().
-  if (typeof turf !== 'undefined') {
+  // N'est appliqué QUE si aucune surface de transition n'a déjà été détectée
+  // depuis les polygones backend (évite le triple-comptage).
+  // Détermine le côté (gauche/droite) de l'obstacle par rapport à l'axe de piste.
+  const transAlreadyCovered = covering.some(c =>
+    c.label && (
+      c.label.toLowerCase().includes('transition') ||
+      c.label === 'transition_gauche' ||
+      c.label === 'transition_droite'
+    )
+  );
+
+  if (!transAlreadyCovered && typeof turf !== 'undefined') {
     try {
       const PENTE_TRANS = 1 / 7;
       const LIMITE_SUP_M = 45 / PENTE_TRANS; // ≈ 315 m
-      // Tolérance longitudinale : la surface de transition s'étend
-      // au-delà des seuils de quelques mètres (bande = seuil ± 60 m)
-      const FRINGE = 0.10; // 10 % de longueur de piste au-delà des seuils
+      const FRINGE = 0.10;
 
       const stripInfo = getTransitionStripInfo(lat, lon);
       if (
@@ -362,10 +393,32 @@ function computeAdmissibleAltitude(lat, lon, obs) {
         stripInfo.fracAlongRunway >= -FRINGE &&
         stripInfo.fracAlongRunway <= 1 + FRINGE
       ) {
+        // Déterminer le côté gauche/droite par rapport à l'axe de piste
+        let transLabel = 'Transition';
+        if (App.runways && App.runways.length >= 2) {
+          try {
+            const r = App.runways.find(x => x.thresholdLat != null && x.thresholdLon != null && x.reciprocal);
+            if (r) {
+              const opp = App.runways.find(op => op.designation === r.reciprocal);
+              if (opp && opp.thresholdLat != null) {
+                // Calcul du produit vectoriel (cross product) pour détecter le côté
+                // Vecteur axe piste : (dx, dy), vecteur axe→obstacle : (ox, oy)
+                const dx = opp.thresholdLon - r.thresholdLon;
+                const dy = opp.thresholdLat - r.thresholdLat;
+                const ox = lon - r.thresholdLon;
+                const oy = lat - r.thresholdLat;
+                const cross = dx * oy - dy * ox;
+                // cross > 0 → gauche du vecteur piste ; cross < 0 → droite
+                transLabel = cross >= 0 ? 'Transition gauche' : 'Transition droite';
+              }
+            }
+          } catch (e) { /* Fallback au label générique */ }
+        }
+
         const d = Math.min(stripInfo.distM, LIMITE_SUP_M);
         const transitionSommetM = stripInfo.altBaseM + d * PENTE_TRANS;
         covering.push({
-          label: 'Transition (géométrie)',
+          label: transLabel,
           sommetM: transitionSommetM,
         });
       }
@@ -417,9 +470,18 @@ function computeBreachedSurfaces(obs) {
   if (obs.latitude == null || obs.longitude == null) return [];
   const { coveringSurfaces } = computeAdmissibleAltitude(obs.latitude, obs.longitude, obs);
   const obstacleAltM = (obs.altitude || 0) * 0.3048;
-  return coveringSurfaces
-    .filter(c => c.sommetM != null && obstacleAltM > c.sommetM)
-    .map(c => ({ label: c.label, sommetM: c.sommetM, depassementM: obstacleAltM - c.sommetM }));
+  
+  const breachedMap = new Map();
+  coveringSurfaces.forEach(c => {
+    if (c.sommetM != null && obstacleAltM > c.sommetM) {
+      const depassementM = obstacleAltM - c.sommetM;
+      if (!breachedMap.has(c.label) || depassementM > breachedMap.get(c.label).depassementM) {
+        breachedMap.set(c.label, { label: c.label, sommetM: c.sommetM, depassementM });
+      }
+    }
+  });
+  
+  return Array.from(breachedMap.values());
 }
 
 /**
