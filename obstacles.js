@@ -88,27 +88,62 @@ function clearObstacleForm() {
 
 /* ══════════════════════════════════════════════════════════
    DÉTECTION DE DOUBLON — helper partagé
-   Un obstacle est considéré comme un doublon si un obstacle
-   existant possède le même identifiant (nom, insensible à la
-   casse) ET les mêmes coordonnées géographiques (lat/lon à
-   0.000001° près, soit ~11 cm). Ce critère s'applique aussi
-   bien à la saisie manuelle qu'à l'import CSV.
+   Deux niveaux de détection pour la saisie manuelle :
+   1. Même identifiant (nom, insensible à la casse) → doublon
+      d'identifiant, même si les coordonnées diffèrent.
+   2. Mêmes champs clés (lat/lon à 0.000001° près + altitude
+      à 1 ft près + type_obstacle) → doublon complet, même si
+      l'identifiant diffère.
+   Ce critère s'applique aussi bien à la saisie manuelle
+   qu'à l'import CSV (voir obstacles-csv-import.js).
 ══════════════════════════════════════════════════════════ */
 /**
- * Vérifie si un obstacle identique existe déjà dans App.allObstacles.
+ * Vérifie si un obstacle similaire existe déjà dans App.allObstacles.
+ * @param {string} name   - Identifiant/désignation de l'obstacle
+ * @param {number} lat    - Latitude en degrés décimaux
+ * @param {number} lon    - Longitude en degrés décimaux
+ * @param {number} [altFt]  - Altitude en pieds (optionnel)
+ * @param {string} [type]   - Type d'obstacle (optionnel)
+ * @returns {{ type: 'none'|'id'|'fields', duplicate: object|null }}
+ *   type='id'     → même identifiant qu'un obstacle existant
+ *   type='fields' → mêmes champs clés (lat/lon/alt/type)
+ *   type='none'   → aucun doublon
+ */
+function checkObstacleDuplicate(name, lat, lon, altFt, type) {
+  const nameLower = (name || '').trim().toLowerCase();
+  const obstacles = App.allObstacles || [];
+
+  // 1. Doublon par identifiant (nom identique, insensible à la casse)
+  const idDup = obstacles.find(obs =>
+    (obs.name || '').trim().toLowerCase() === nameLower
+  );
+  if (idDup) return { type: 'id', duplicate: idDup };
+
+  // 2. Doublon par champs clés (lat/lon/altitude/type identiques)
+  const fieldsDup = obstacles.find(obs => {
+    const sameLat = obs.latitude != null && Math.abs(obs.latitude - lat) < 0.000001;
+    const sameLon = obs.longitude != null && Math.abs(obs.longitude - lon) < 0.000001;
+    const sameAlt = altFt === undefined || altFt === null || isNaN(altFt)
+      || (obs.altitude_max != null && Math.abs(obs.altitude_max - altFt) < 1);
+    const sameType = !type || !obs.type_obstacle
+      || obs.type_obstacle === type || labelToTypeObstacle(type) === obs.type_obstacle;
+    return sameLat && sameLon && sameAlt && sameType;
+  });
+  if (fieldsDup) return { type: 'fields', duplicate: fieldsDup };
+
+  return { type: 'none', duplicate: null };
+}
+
+/**
+ * Compatibilité ascendante — utilisée par obstacles-csv-import.js.
  * @param {string} name - Identifiant/désignation de l'obstacle
  * @param {number} lat  - Latitude en degrés décimaux
  * @param {number} lon  - Longitude en degrés décimaux
  * @returns {boolean} true si un doublon est détecté
  */
 function isObstacleDuplicate(name, lat, lon) {
-  const nameLower = (name || '').trim().toLowerCase();
-  return (App.allObstacles || []).some(obs => {
-    const sameName = (obs.name || '').trim().toLowerCase() === nameLower;
-    const sameLat = obs.latitude != null && Math.abs(obs.latitude - lat) < 0.000001;
-    const sameLon = obs.longitude != null && Math.abs(obs.longitude - lon) < 0.000001;
-    return sameName && sameLat && sameLon;
-  });
+  const result = checkObstacleDuplicate(name, lat, lon);
+  return result.type !== 'none';
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -153,8 +188,21 @@ async function submitObstacle() {
   }
 
   // ── Détection de doublon (saisie manuelle) ───────────────────────────────
-  if (isObstacleDuplicate(name, lat, lon)) {
-    showToast('⚠ Obstacle déjà existant (même identifiant et mêmes coordonnées)', 'error');
+  const M_TO_FT_CHK = 3.28084;
+  const altFtChk = !isNaN(altM) ? altM * M_TO_FT_CHK : undefined;
+  const dupCheck = checkObstacleDuplicate(name, lat, lon, altFtChk, type);
+  if (dupCheck.type === 'id') {
+    showToast(
+      `⚠ Doublon détecté : l'identifiant "${name}" est déjà utilisé par un obstacle existant. Veuillez choisir un identifiant différent.`,
+      'error'
+    );
+    return;
+  }
+  if (dupCheck.type === 'fields') {
+    showToast(
+      '⚠ Doublon détecté : un obstacle avec les mêmes coordonnées, altitude et type existe déjà. Veuillez vérifier les données saisies.',
+      'error'
+    );
     return;
   }
   // ─────────────────────────────────────────────────────────────────────────
