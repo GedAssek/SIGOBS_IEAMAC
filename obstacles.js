@@ -240,7 +240,7 @@ function buildObstaclePayload({ name, proprietaire, type, lat, lon, altM, height
     // backend, avec un sous-type conservé côté client pour le voyant dédié.
     permanence: temporal === 'permanent' ? 'Permanent' : 'Temporaire',
     type_temporel: temporal, // 'permanent' | 'temporary' | 'construction'
-    ...(temporal !== 'permanent' && expiry ? { date_expiration: expiry } : {}),
+    ...(temporal !== 'permanent' && expiry ? { date_echeance: expiry } : {}),
 
     // ── Attributs étendus — conformes au Tableau A6-2 (Annexe 15 OACI) ──
     // Envoyés en plus du schéma de base ; ignorés sans risque par un
@@ -278,6 +278,12 @@ async function createAndEvaluateObstacle(payload) {
     // 1. Sauvegarder l'obstacle — réponse: { success, data: obstacle }
     const res = await apiFetch('/obstacles', 'POST', payload);
     const apiObs = normalizeObstacleFromAPI(res.data);
+
+    // Fallback: si le backend ignore la date d'expiration, on la force localement
+    if (payload.date_echeance && !apiObs.expiry) {
+      apiObs.expiry = payload.date_echeance;
+    }
+
     if (apiObs.latitude === null || isNaN(apiObs.latitude)) apiObs.latitude = payload.latitude || payload.geometrie?.coordinates[1];
     if (apiObs.longitude === null || isNaN(apiObs.longitude)) apiObs.longitude = payload.longitude || payload.geometrie?.coordinates[0];
     // Conserver les attributs étendus localement (le backend peut ne pas les renvoyer)
@@ -286,7 +292,7 @@ async function createAndEvaluateObstacle(payload) {
     // 2. Évaluation OLS — réservé Admin et Evaluator
     const isAdmin = typeof getIsAdmin === 'function' ? getIsAdmin() : false;
     const isEvaluator = typeof getIsEvaluator === 'function' ? getIsEvaluator() : false;
-    
+
     if (isAdmin || isEvaluator) {
       try {
         const evalRes = await apiFetch('/obstacles/' + apiObs._id + '/evaluer', 'POST');
@@ -400,71 +406,85 @@ function renderSurfacesBreachTable(surfListEl, obs) {
    LISTE DES OBSTACLES
    GET /obstacles?aerodrome_id=:mongoId  (doc §7.3)
 ══════════════════════════════════════════════════════════ */
+// État de la pagination
+App.obstaclesPage = App.obstaclesPage || 1;
+App.obstaclesTotalPages = 1;
+
 async function loadObstaclesList() {
   const mongoId = App.aerodromeMongoId;
   if (!mongoId) return;
   try {
-    const res = await apiFetch(`/obstacles?aerodrome_id=${mongoId}`);
-    const raw = res.data || [];
+    const res = await apiFetch(`/obstacles?aerodrome_id=${mongoId}&page=${App.obstaclesPage}&limit=10&submitter=true`);
+    const raw = res.data || (Array.isArray(res) ? res : []);
     App.allObstacles = raw.map(normalizeObstacleFromAPI);
     App.obstacles = [...App.allObstacles];
+    
+    // Déduction robuste du nombre total de pages
+    const isFullPage = raw.length >= 10;
+    if (res.pagination && res.pagination.totalPages) App.obstaclesTotalPages = res.pagination.totalPages;
+    else if (res.totalPages) App.obstaclesTotalPages = res.totalPages;
+    else if (res.total_pages) App.obstaclesTotalPages = res.total_pages;
+    else if (res.total && res.total > 10) App.obstaclesTotalPages = Math.ceil(res.total / 10);
+    else if (isFullPage) App.obstaclesTotalPages = App.obstaclesPage + 1; // Toujours supposer une suite si la page est pleine
+    else App.obstaclesTotalPages = App.obstaclesPage;
+    
+    updatePaginationUI();
 
-    await fetchObstacleCreators();
+    // Vérification des échéances
+    const now = new Date();
+    const expiredCount = App.allObstacles.filter(obs => {
+      if (obs.temporal === 'permanent' || !obs.temporal || !obs.expiry) return false;
+      return Math.ceil((new Date(obs.expiry) - now) / 86400000) < 0;
+    }).length;
+    const soonCount = App.allObstacles.filter(obs => {
+      if (obs.temporal === 'permanent' || !obs.temporal || !obs.expiry) return false;
+      const d = Math.ceil((new Date(obs.expiry) - now) / 86400000);
+      return d >= 0 && d <= 3;
+    }).length;
+    if (expiredCount > 0) showToast(`Attention : ${expiredCount} obstacle(s) temporaire(s) expiré(s) !`, 'error');
+    if (soonCount > 0) showToast(`Attention : ${soonCount} obstacle(s) à échéance dans moins de 3 jours !`, 'warn');
 
-    filterObstacles(); // au lieu de renderObstaclesList direct
+    // fetchObstacleCreators() supprimé car le backend inclut 'createur' via submitter=true
+
+    filterObstacles();
     updateObstaclesLayer();
     updateConformityPanel();
 
     await reconcileObstacleVerdicts();
+
+    // Pré-chargement silencieux des événements pour accélérer
+    // l'onglet Archive et le bouton HISTORIQUE
+    if (!App.cachedEvents) {
+      apiFetch('/evenements').then(r => { App.cachedEvents = r.data || []; }).catch(() => { });
+    }
   } catch (e) {
     console.warn('[loadObstaclesList]', e);
     filterObstacles();
   }
 }
 
-/**
- * Retrouve le vrai soumetteur de chaque obstacle en croisant GET /evenements
- * (le modèle Obstacle lui-même ne porte aucun champ créateur — seule la
- * trace d'audit sait "qui a créé quoi", via utilisateur_id sur l'événement
- * CREATE). Réservé à l'admin, seul rôle autorisé à voir la colonne
- * SOUMIS PAR — on évite ainsi un appel réseau inutile pour les autres rôles.
- */
-async function fetchObstacleCreators() {
-  if (!getIsAdmin()) return;
-  try {
-    const res = await apiFetch('/evenements');
-    const events = res.data || [];
-    const creations = events.filter(ev => ev.type_action === 'CREATE' && ev.collection_impactee === 'Obstacle');
-    // En cas de plusieurs événements CREATE pour un même document_id (rare),
-    // on garde le plus récent.
-    const byObstacleId = {};
-    creations.forEach(ev => {
-      const existing = byObstacleId[ev.document_id];
-      if (!existing || new Date(ev.createdAt) > new Date(existing.createdAt)) {
-        byObstacleId[ev.document_id] = ev;
-      }
-    });
-    App.allObstacles.forEach(obs => {
-      const ev = byObstacleId[obs._id];
-      if (ev?.utilisateur_id) {
-        const u = ev.utilisateur_id;
-        // Extraire l'email
-        if (u.email) obs.soumisParEmail = u.email;
-        // Extraire le nom complet si disponible (nom, prenom, username, etc.)
-        const nom = [u.prenom, u.nom].filter(Boolean).join(' ').trim()
-          || u.username || u.name || u.nomComplet || '';
-        if (nom) obs.soumisParNom = nom;
-        // Affichage combiné : "Prénom NOM <email>" ou juste email
-        obs.soumisParDisplay = nom
-          ? `${nom}${u.email ? ' — ' + u.email : ''}`
-          : (u.email || '—');
-      }
-    });
-    filterObstacles();
-  } catch (e) {
-    console.warn('[fetchObstacleCreators]', e.message);
-  }
+function changeObstaclesPage(delta) {
+  const newPage = App.obstaclesPage + delta;
+  if (newPage < 1 || newPage > App.obstaclesTotalPages) return;
+  App.obstaclesPage = newPage;
+  loadObstaclesList();
 }
+
+function updatePaginationUI() {
+  const paginationDiv = document.getElementById('obstacles-pagination');
+  const btnPrev = document.getElementById('btn-prev-page');
+  const btnNext = document.getElementById('btn-next-page');
+  const info = document.getElementById('pagination-info');
+  
+  if (!paginationDiv) return;
+  
+  paginationDiv.style.display = 'flex';
+  info.textContent = `Page ${App.obstaclesPage || 1} sur ${App.obstaclesTotalPages || 1}`;
+  
+  btnPrev.disabled = App.obstaclesPage <= 1;
+  btnNext.disabled = App.obstaclesPage >= (App.obstaclesTotalPages || 1);
+}
+
 
 /**
  * Recharge le verdict OLS authoritatif (perce / percements) depuis le backend
@@ -544,7 +564,7 @@ function renderObstaclesList(list) {
   if (soumisColHeader) soumisColHeader.style.display = showSoumis ? '' : 'none';
 
   if (!list.length) {
-    tbody.innerHTML = `<tr class="table-placeholder"><td colspan="${showSoumis ? 15 : 14}">Aucun obstacle trouvé</td></tr>`;
+    tbody.innerHTML = `<tr class="table-placeholder"><td colspan="${showSoumis ? 16 : 15}">Aucun obstacle trouvé</td></tr>`;
     return;
   }
   tbody.innerHTML = list.map(obs => {
@@ -556,12 +576,22 @@ function renderObstaclesList(list) {
 
     const statusTag = `<span class="tag tag-${obs.status || 'draft'}">${statusLabel(obs.status)}</span>`;
     const temporal = buildTemporalBadge(obs);
+    const expiryBadge = buildExpiryBadge(obs);
     const clearance = (typeof formatClearanceBadge === 'function') ? formatClearanceBadge(obs) : '—';
+    let soumisInfo = '—';
+    if (obs.createur) {
+      const u = obs.createur;
+      const nom = [u.prenom, u.nom].filter(Boolean).join(' ').trim() || u.username || u.name || u.nomComplet || '';
+      soumisInfo = nom ? `${nom}${u.email ? ' — ' + u.email : ''}` : (u.email || '—');
+    }
     const soumisCell = showSoumis
-      ? `<td style="font-size:10px;color:var(--text-secondary);" title="${obs.soumisParEmail || obs.creatorEmail || '—'}">${obs.soumisParDisplay || obs.soumisParEmail || obs.creatorEmail || obs.soumisParNom || '—'}</td>`
+      ? `<td style="font-size:10px;color:var(--text-secondary);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${soumisInfo}">${soumisInfo}</td>`
       : '';
-    // Surface(s) concernée(s) — surfaces OLS percées par l'obstacle, avec badges colorés
+    // Surface(s) concernée(s) — on ne garde que la surface déterminante (celle avec le pire dépassement)
     const breachedSurfs = (typeof computeBreachedSurfaces === 'function') ? computeBreachedSurfaces(obs) : [];
+    const worstSurface = breachedSurfs.length
+      ? [breachedSurfs.reduce((max, b) => (b.depassementM > max.depassementM ? b : max), breachedSurfs[0])]
+      : [];
 
     // Palette couleur par famille de surface OLS
     const surfaceColor = (label = '') => {
@@ -584,14 +614,14 @@ function renderObstaclesList(list) {
       return { bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.20)', color: '#991B1B' };
     };
 
-    const surfaceCell = breachedSurfs.length
-      ? `<div class="surface-tags-cell">${breachedSurfs.map(b => {
-          const c = surfaceColor(b.label);
-          return `<span class="surface-tag-pill" style="background:${c.bg};border-color:${c.border};color:${c.color};"
+    const surfaceCell = worstSurface.length
+      ? `<div class="surface-tags-cell">${worstSurface.map(b => {
+        const c = surfaceColor(b.label);
+        return `<span class="surface-tag-pill" style="background:${c.bg};border-color:${c.border};color:${c.color};"
             title="Dépassement : ${b.depassementM != null ? b.depassementM.toFixed(1) + ' m' : 'N/A'}">
             <span class="surface-tag-dot" style="background:${c.color};"></span>${b.label}
           </span>`;
-        }).join('')}</div>`
+      }).join('')}</div>`
       : `<span class="surface-tag-none ${penetrates ? 'surface-tag-unknown' : 'surface-tag-ok'}">—</span>`;
     return `<tr>
       <td style="font-weight:600;">${obs.name}</td>
@@ -602,15 +632,17 @@ function renderObstaclesList(list) {
       <td class="mono">${obs.altitude != null ? (obs.altitude * 0.3048).toFixed(1) : '—'}</td>
       <td class="mono">${obs.height != null && obs.height !== 0 ? (obs.height * 0.3048).toFixed(1) : '—'}</td>
       <td>${temporal}</td>
+      <td>${expiryBadge}</td>
       <td>${verdict}</td>
       <td>${clearance}</td>
       <td>${surfaceCell}</td>
       <td>${buildActionSelect(obs)}</td>
       <td>${statusTag}</td>
       ${soumisCell}
-      <td>${buildWorkflowActions(obs)}</td>
+      <td><div class="action-group">${buildWorkflowActions(obs)}</div></td>
     </tr>`;
   }).join('');
+
 
   const pending = list.filter(o => o.status === 'pending').length;
   const pendingEl = document.getElementById('pending-count');
@@ -628,31 +660,33 @@ function buildTemporalBadge(obs) {
   if (obs.temporal === 'permanent' || !obs.temporal) {
     return `<span class="tag tag-info">PERM</span>`;
   }
-  const isConstruction = obs.temporal === 'construction';
-  if (!obs.expiry) {
-    return isConstruction
-      ? `<span class="tag tag-warn">🔶 À SURVEILLER (chantier)</span>`
-      : `<span class="tag tag-warn">TEMP</span>`;
-  }
+  return `<span class="tag tag-warn">TEMP</span>`;
+}
+
+/**
+ * Construit le badge de la colonne ÉCHÉANCE — uniquement pour les temporaires.
+ * Retourne une cellule vide pour les permanents.
+ */
+function buildExpiryBadge(obs) {
+  if (obs.temporal === 'permanent' || !obs.temporal) return '<span style="color:var(--text-dim)">—</span>';
+  if (!obs.expiry) return '<span style="color:var(--text-dim)">—</span>';
+
   const now = new Date();
   const exp = new Date(obs.expiry);
+  if (isNaN(exp.getTime())) return '<span style="color:var(--text-dim)">—</span>';
+
   const daysLeft = Math.ceil((exp - now) / 86400000);
-  if (isNaN(daysLeft)) {
-    return isConstruction ? `<span class="tag tag-warn">🔶 À SURVEILLER (chantier)</span>` : `<span class="tag tag-warn">TEMP</span>`;
-  }
+  const dateStr = exp.toLocaleDateString('fr-FR');
+
   if (daysLeft < 0) {
-    return `<span class="tag tag-fail" title="Échéance dépassée le ${exp.toLocaleDateString('fr-FR')}">EXPIRÉ</span>`;
+    return `<span class="expiry-badge expiry-critical" title="Expiré le ${dateStr}"><span class="expiry-icon">🔴</span>EXPIRÉ — ${dateStr}</span>`;
   }
-  // Un projet de construction reste "à surveiller" tant qu'il n'a pas expiré,
-  // quel que soit le nombre de jours restants — c'est le voyant demandé.
-  if (isConstruction) {
-    return `<span class="tag tag-warn" title="Fin de chantier prévue : ${exp.toLocaleDateString('fr-FR')}">🔶 À SURVEILLER · J-${daysLeft}</span>`;
+  if (daysLeft <= 3) {
+    return `<span class="expiry-badge expiry-warn" title="Echéance dans ${daysLeft} jour(s)"><span class="expiry-icon">⚠️</span>${dateStr} • J-${daysLeft}</span>`;
   }
-  if (daysLeft <= 30) {
-    return `<span class="tag tag-warn" title="Échéance : ${exp.toLocaleDateString('fr-FR')}">À SURVEILLER · J-${daysLeft}</span>`;
-  }
-  return `<span class="tag tag-info" title="Échéance : ${exp.toLocaleDateString('fr-FR')}">TEMP · J-${daysLeft}</span>`;
+  return `<span class="expiry-badge expiry-ok">${dateStr}</span>`;
 }
+
 
 /** Sélecteur en ligne pour l'état de balisage (conforme / satisfaisant / non conforme) — retour n°11 */
 function buildBalisageSelect(obs) {
@@ -743,6 +777,9 @@ function buildWorkflowActions(obs) {
   const isEvaluator = typeof getIsEvaluator === 'function' ? getIsEvaluator() : false;
   const isDataTech = typeof getIsDataTech === 'function' ? getIsDataTech() : false;
 
+  // Historique des événements
+  actions.push(`<button class="action-btn" onclick="showObstacleHistory('${obs._id}', '${(obs.name || '').replace(/'/g, "\\'")}')" title="Historique des événements">HISTORIQUE</button>`);
+
   // Voir le détail de pénétration
   actions.push(`<button class="action-btn" onclick="showObstacleConformityDetail('${obs._id}')" title="Détail conformité">DÉTAIL</button>`);
 
@@ -759,10 +796,7 @@ function buildWorkflowActions(obs) {
     actions.push(`<button class="action-btn pending" onclick="setObstacleStatus('${obs._id}','pending')">SOUMETTRE</button>`);
   }
 
-  // Évaluer (OLS) — Automatique si Backend le fait, mais déclenchable manuellement par Evaluator/Admin
-  if (obs.status === 'pending' && (isAdmin || isEvaluator)) {
-    actions.push(`<button class="action-btn pending" style="border-color:var(--indigo); color:var(--indigo)" onclick="evaluerObstacle('${obs._id}')" title="Évaluer les perçages OLS">ÉVALUER (OLS)</button>`);
-  }
+  // Évaluer (OLS) — Suppression demandée car l'évaluation est automatique à la création/modification
 
   // Valider ou Rejeter (Admin, Evaluator)
   if (obs.status === 'pending' && (isAdmin || isEvaluator)) {
@@ -774,7 +808,73 @@ function buildWorkflowActions(obs) {
   if (isAdmin || isDataTech || isEvaluator) {
     actions.push(`<button class="action-btn delete" onclick="confirmDelete('${obs._id}','${obs.name.replace(/'/g, "\\'")}')">✕</button>`);
   }
-  return `<div class="action-group">${actions.join('')}</div>`;
+  return actions.join('');
+}
+
+async function showObstacleHistory(id, name) {
+  try {
+    // Toujours interroger le backend pour être sûr d'avoir l'historique complet de ce document spécifique
+    const res = await apiFetch(`/evenements?document_id=${id}`);
+    const events = res.data || [];
+
+    if (!events.length) {
+      showToast('Aucun historique trouvé pour cet obstacle.', 'info');
+      return;
+    }
+
+    const ACTION_LABELS = { CREATE: 'Création', UPDATE: 'Modification', DELETE: 'Suppression', UNDELETE: 'Restauration' };
+    const ACTION_CLASSES = { CREATE: 'tag-pass ev-create', UPDATE: 'tag-info', DELETE: 'tag-fail ev-delete', UNDELETE: 'tag-warn' };
+
+
+    let html = `<div style="max-height:65vh; overflow-y:auto; padding:2px 4px;">`;
+    let idx = 0;
+    events.forEach(ev => {
+      const date = new Date(ev.date_heure || ev.createdAt).toLocaleString('fr-FR');
+      const auteur = ev.auteur || ev.utilisateur_id?.email || 'Système';
+      
+      let actionClass = 'tag-info';
+      const actionStr = (ev.action || ev.type_action || '').toLowerCase();
+      if (actionStr.includes('création') || actionStr === 'create') actionClass = 'tag-pass ev-create';
+      if (actionStr.includes('suppression') || actionStr === 'delete') actionClass = 'tag-fail ev-delete';
+      
+      const actionLabel = ev.action || ev.type_action || 'Action';
+      const propsMods = Array.isArray(ev.proprietes_modifiees) ? ev.proprietes_modifiees : [];
+      
+      let summary = 'Modification technique';
+      if (actionStr.includes('création') || actionStr === 'create') summary = 'Obstacle créé';
+      else if (actionStr.includes('suppression') || actionStr === 'delete') summary = 'Obstacle supprimé';
+      else if (propsMods.length > 0) summary = `Champs modifiés : ${propsMods.join(', ')}`;
+      
+      const evClass = actionClass.includes('ev-create') ? 'ev-create' : (actionClass.includes('ev-delete') ? 'ev-delete' : '');
+      const eventId = ev.id || ev._id;
+
+      html += `
+        <div class="history-event-card">
+          <div class="history-event-header">
+            <span style="font-size:12px;font-weight:600;color:var(--text-primary);">${date}</span>
+            <span class="tag ${actionClass}">${actionLabel}</span>
+          </div>
+          <div class="history-event-meta">
+            <svg viewBox="0 0 16 16" fill="none" width="11" height="11" style="vertical-align:middle;margin-right:3px;">
+              <circle cx="8" cy="5" r="2.5" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M2 14c0-3 2.5-5 6-5s6 2 6 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+            ${auteur}
+          </div>
+          <div class="history-event-summary ${evClass}">${summary}</div>
+          ${eventId ? `
+          <button class="history-toggle-detail" onclick="showEventDetails('${eventId}')">▶ Voir le détail des modifications</button>
+          ` : ''}
+        </div>
+      `;
+    });
+    html += `</div>`;
+
+    showModal(`Historique : ${name} (${events.length} événement${events.length > 1 ? 's' : ''})`, html);
+  } catch (err) {
+    console.error('[showObstacleHistory]', err);
+    showToast('Erreur lors du chargement de l\'historique.', 'error');
+  }
 }
 
 /**
@@ -786,7 +886,7 @@ async function evaluerObstacle(id) {
     const evalData = res.data || {};
     showToast('Évaluation OLS terminée.', 'info');
     // Rafraîchir les obstacles pour voir le statut final
-    loadObstacles();
+    if (typeof loadObstaclesList === 'function') loadObstaclesList();
   } catch (e) {
     showToast("Erreur lors de l'évaluation : " + e.message, 'error');
   }
@@ -814,15 +914,29 @@ function showObstacleConformityDetail(id) {
   let geomLine = '';
   if (typeof computeObstacleClearance === 'function') {
     const { clearanceM, admissibleM, surfaceLabel, horsSurfaces } = computeObstacleClearance(obs);
+    const breached = (typeof computeBreachedSurfaces === 'function') ? computeBreachedSurfaces(obs) : [];
+
     if (horsSurfaces) {
       geomLine = ' — HORS SURFACES OLS (aucune surface ne couvre cette position)';
     } else if (admissibleM != null) {
       geomLine = clearanceM >= 0
-        ? ` — Altitude admissible : ${admissibleM.toFixed(1)} m · Dégagement : +${clearanceM.toFixed(1)} m (${surfaceLabel || '—'})`
-        : ` — Altitude admissible : ${admissibleM.toFixed(1)} m · Dépassement : ${Math.abs(clearanceM).toFixed(1)} m (${surfaceLabel || '—'})`;
+        ? ` — CONFORME · Dégagement min : +${clearanceM.toFixed(1)} m (Surface limitante : ${surfaceLabel || '—'})`
+        : ` — ${breached.length} SURFACE(S) PÉNÉTRÉE(S) · Dépassement max : ${Math.abs(clearanceM).toFixed(1)} m (Surface la plus critique : ${surfaceLabel || '—'})`;
     }
   }
-  if (subEl) subEl.textContent = `OBSTACLE : ${obs.name}${geomLine}`;
+
+  let tempLine = '';
+  if (obs.temporal === 'temporary' || obs.temporal === 'construction') {
+    if (obs.expiry) {
+      const expDate = new Date(obs.expiry).toLocaleDateString('fr-FR');
+      const isExpired = new Date(obs.expiry) < new Date();
+      tempLine = ` — [TEMP. Échéance : ${expDate}${isExpired ? ' ⚠️ EXPIRÉ' : ''}]`;
+    } else {
+      tempLine = ` — [TEMP.]`;
+    }
+  }
+
+  if (subEl) subEl.textContent = `OBSTACLE : ${obs.name}${tempLine}${geomLine}`;
   renderSurfacesBreachTable(surfListEl, obs);
 }
 
@@ -930,6 +1044,11 @@ async function updateObstacle(id, payload) {
   try {
     const res = await apiFetch(`/obstacles/${id}`, 'PATCH', payload);
     const apiObs = normalizeObstacleFromAPI(res.data || { ...payload, _id: id });
+
+    if (payload.date_echeance && !apiObs.expiry) {
+      apiObs.expiry = payload.date_echeance;
+    }
+
     const updated = {
       ...apiObs,
       latitude: (apiObs.latitude !== null && !isNaN(apiObs.latitude)) ? apiObs.latitude : (payload.latitude || payload.geometrie?.coordinates[1]),
@@ -940,7 +1059,7 @@ async function updateObstacle(id, payload) {
     // Ré-évaluer après modification (réservé Admin et Evaluator)
     const isAdmin = typeof getIsAdmin === 'function' ? getIsAdmin() : false;
     const isEvaluator = typeof getIsEvaluator === 'function' ? getIsEvaluator() : false;
-    
+
     if (isAdmin || isEvaluator) {
       try {
         const evalRes = await apiFetch(`/obstacles/${id}/evaluer`, 'POST');

@@ -85,8 +85,8 @@ async function submitAerodrome() {
   };
   const lat = readDms('aero-add-lat', 'N');
   const lon = readDms('aero-add-lon', 'E');
-  if (!codeOaci || !nom || isNaN(lat) || isNaN(lon)) {
-    showToast('Code OACI, nom et coordonnées sont requis', 'warn');
+  if (!codeOaci || !nom || !ville || isNaN(lat) || isNaN(lon) || isNaN(altitude)) {
+    showToast('Code OACI, nom, ville, altitude et coordonnées sont requis', 'warn');
     return;
   }
   if (isNaN(magVar)) {
@@ -99,8 +99,8 @@ async function submitAerodrome() {
     nom,
     pays: pays || undefined,
     ville: ville || undefined,
-    iata: iata || undefined,
-    altitude: isNaN(altitude) ? undefined : Math.round(altitude * 3.28084 * 100) / 100,
+    code_iata: iata || undefined,
+    altitude: Math.round(altitude * 3.28084 * 100) / 100, // already validated as !isNaN
     var: magVar,
     point_reference: { type: 'Point', coordinates: [lon, lat] },
   };
@@ -228,7 +228,7 @@ function openEditAerodromeModal(id) {
        </div>
        <div class="field-group">
          <label class="field-label">CODE IATA</label>
-         <input type="text" id="edit-aero-iata" class="field-input" value="${a.iata || ''}" maxlength="3" />
+         <input type="text" id="edit-aero-iata" class="field-input" value="${a.code_iata || a.iata || ''}" maxlength="3" />
        </div>
        <div class="field-group" style="grid-column:1/-1;">
          <label class="field-label">NOM DE L'AÉRODROME</label>
@@ -313,7 +313,8 @@ function openEditAerodromeModal(id) {
       const patch = {
         code_oaci: icao,
         nom,
-        ...(iata ? { iata } : {}),
+        code_iata: iata || "",
+        iata: iata || "",
         ...(ville ? { ville } : {}),
         ...(pays ? { pays } : {}),
         ...(!isNaN(altM) ? { altitude: Math.round(altM * 3.28084 * 100) / 100 } : {}),

@@ -103,6 +103,7 @@ async function loadAerodromeById(id, raw) {
     const schema = normalizeAerodromeFromAPI(raw, pistesRaw);
     applyAerodromeToUI(schema);
     // Réinitialiser les obstacles affichés avant de charger ceux du nouvel aérodrome
+    App.obstaclesPage = 1;
     App.obstacles = []; App.allObstacles = [];
     await loadObstaclesList();
 
@@ -192,12 +193,13 @@ function selectRunway(rwy) {
   const label = document.getElementById('active-runway-label');
   if (label) label.textContent = `RWY ${rwy.designation || '—'}  |  ${rwy.length || '—'} m  ×  ${rwy.width || '—'} m`;
 
-  document.getElementById('rwy-desig').textContent   = rwy.designation || '—';
-  document.getElementById('rwy-length').textContent  = rwy.length   ? `${rwy.length} m`     : '—';
-  document.getElementById('rwy-width').textContent   = rwy.width    ? `${rwy.width} m`      : '—';
-  document.getElementById('rwy-bearing').textContent = rwy.trueHeading != null ? `${rwy.trueHeading}°` : '—';
-  document.getElementById('rwy-elev').textContent    = rwy.elevation != null   ? `${(rwy.elevation * 0.3048).toFixed(1)} m` : '—';
-  document.getElementById('rwy-code').textContent    = rwy.icaoCode || '—';
+  const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+  setText('rwy-desig', rwy.designation || '—');
+  setText('rwy-length', rwy.length ? `${rwy.length} m` : '—');
+  setText('rwy-width', rwy.width ? `${rwy.width} m` : '—');
+  setText('rwy-bearing', rwy.trueHeading != null ? `${rwy.trueHeading}°` : '—');
+  setText('rwy-elev', rwy.elevation != null ? `${(rwy.elevation * 0.3048).toFixed(1)} m` : '—');
+  setText('rwy-code', rwy.icaoCode || '—');
 
   const meta = document.getElementById('runway-meta');
   meta.innerHTML =

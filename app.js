@@ -293,10 +293,11 @@ function normalizeObstacleFromAPI(raw) {
     altitude: raw.altitude_max ?? raw.altitude ?? 0,
     height: raw.hauteur ?? raw.height ?? 0,
     temporal: (raw.permanence === 'Temporaire' || raw.temporal === 'temporary') ? 'temporary' : 'permanent',
-    expiryDate: raw.date_expiration || raw.expiryDate || null,
+    expiryDate: raw.date_echeance || raw.date_expiration || raw.expiryDate || null,
     status: normalizeStatusBack(raw.statut_validation || raw.status || 'Draft'),
     aerodromeIcao: raw.aerodrome_id?.code_oaci || raw.aerodromeIcao || '',
     importedFromAixm: raw.importe_depuis_aixm || false,
+    createur: raw.createur || null,
     createdAt: raw.createdAt,
   };
 }
@@ -385,7 +386,7 @@ function normalizeAerodromeFromAPI(raw) {
     elevation: raw.altitude || raw.elevation || 0,
     country: raw.pays || raw.country || '',
     city: raw.ville || raw.city || '',
-    iata: raw.iata || '',
+    iata: raw.code_iata || raw.iata || '',
     source: raw.source || 'ourairports',
     runways: runwaysFull.length ? runwaysFull : runways,
   };

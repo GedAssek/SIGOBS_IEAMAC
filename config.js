@@ -20,6 +20,10 @@ const App = {
   runways: [], activeRunway: null,
   obstacles: [], allObstacles: [], coordMode: 'dms', modalAction: null,
   map3dLabels: true,
+  // Cache des événements d'audit (GET /evenements) — chargé une fois à l'init
+  // et réutilisé par l'onglet Archive et l'historique par obstacle.
+  cachedEvents: null,
+  showAllObstacles: false,
 };
 
 /* ── Carte (MapLibre GL JS) ───────────────────────────────── */

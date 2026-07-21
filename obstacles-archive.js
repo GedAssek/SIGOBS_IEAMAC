@@ -70,133 +70,71 @@ const TEMPORALITY_LABELS = {
   TEMPDELTA: 'TEMPDELTA (changement temporaire)',
 };
 
-/** Résume les champs modifiés entre anciennes_valeurs et nouvelles_valeurs pour affichage */
-function summarizeEventDiff(ev) {
-  const before = ev.anciennes_valeurs || {};
-  const after = ev.nouvelles_valeurs || {};
-  const allKeys = [...new Set([...Object.keys(before), ...Object.keys(after)])];
-  
-  // 1. Filtrer pour ne garder que ce qui a réellement changé
-  let changedKeys = allKeys.filter(k => JSON.stringify(before[k]) !== JSON.stringify(after[k]));
-  
-  if (ev.type_action === 'CREATE' || Object.keys(before).length === 0) {
-    return 'Création initiale';
-  }
-  if (ev.type_action === 'DELETE') {
-    return 'Document supprimé';
-  }
-
-  // 2. Ignorer les champs techniques non user-friendly
-  const ignore = ['_id', '__v', 'createdAt', 'updatedAt', 'aerodrome_id', 'is_deleted'];
-  changedKeys = changedKeys.filter(k => !ignore.includes(k));
-
-  if (!changedKeys.length) return 'Aucune modification visible';
-
-  return changedKeys.slice(0, 3).map(k => {
-    let b = before[k], a = after[k];
-    
-    // Résolution d'ID pour piste_id
-    if (k === 'piste_id') {
-      const rb = App.runways?.find(r => r._id === b);
-      const ra = App.runways?.find(r => r._id === a);
-      if (rb) b = `${rb.qfu1 || rb.qfu_1 || ''}/${rb.qfu2 || rb.qfu_2 || ''}`;
-      if (ra) a = `${ra.qfu1 || ra.qfu_1 || ''}/${ra.qfu2 || ra.qfu_2 || ''}`;
-    }
-
-    if (a === undefined || a === null || a === '') return `${k} effacé`;
-    if (b === undefined || b === null || b === '') return `${k} renseigné`;
-    
-    // Simplifier les gros objets (comme géométrie)
-    if (typeof b === 'object' || typeof a === 'object') {
-       return `${k} modifié`;
-    }
-    
-    return `${k} : ${b} → ${a}`;
-  }).join(' · ') + (changedKeys.length > 3 ? ` (+${changedKeys.length - 3})` : '');
-}
-
-/** Retrouve un nom lisible pour le document concerné par l'événement */
-function resolveEventObjectName(ev) {
-  const docObj = (ev.document_id && typeof ev.document_id === 'object') ? ev.document_id : { _id: ev.document_id };
-  const docId = docObj._id;
-  
-  if (ev.collection_impactee === 'Obstacle') {
-    const obs = App.allObstacles?.find(o => o._id === docId);
-    return obs?.name || docObj.nom || docId;
-  }
-  if (ev.collection_impactee === 'Aerodrome') {
-    return App.aerodrome?.icao || App.aerodrome?.name || docObj.nom || docId;
-  }
-  if (ev.collection_impactee === 'Piste') {
-    const rwy = App.runways?.find(r => r._id === docId);
-    return rwy ? `${rwy.qfu1 || ''}/${rwy.qfu2 || ''}` : (docObj.nom || docId);
-  }
-  return docObj.nom || docId;
-}
-
-/** Détermine si un événement backend concerne l'aérodrome courant */
-function eventBelongsToCurrentAerodrome(ev) {
-  const docId = (ev.document_id && typeof ev.document_id === 'object') ? ev.document_id._id : ev.document_id;
-  if (!docId) return false;
-
-  if (ev.collection_impactee === 'Aerodrome') return docId === App.aerodromeMongoId;
-  if (ev.collection_impactee === 'Obstacle') {
-    return (App.allObstacles || []).some(o => o._id === docId);
-  }
-  if (ev.collection_impactee === 'Piste') {
-    return (App.runways || []).some(r => r._id === docId);
-  }
-  return false; // autres collections (Utilisateur, Role...) hors périmètre de cet onglet
-}
+// Fonctions obsolètes supprimées (summarizeEventDiff, resolveEventObjectName, eventBelongsToCurrentAerodrome)
 
 /**
  * Récupère les événements d'audit depuis le backend (GET /evenements),
  * filtrés sur l'aérodrome courant. Retombe sur le journal local si
  * l'utilisateur n'a pas le rôle requis (403) ou en cas d'erreur réseau.
+ * Stocke le résultat dans App.cachedEvents pour un accès instantané
+ * depuis l'historique par obstacle (sans re-fetch).
  */
-async function fetchArchiveEntries() {
+async function fetchArchiveEntries(forceRefresh = false) {
+  // Utiliser le cache si disponible et pas de rafraîchissement forcé
+  if (!forceRefresh && App.cachedEvents && App.cachedEvents.length > 0) {
+    return { source: 'backend', entries: App.cachedEvents, fromCache: true };
+  }
   try {
     const res = await apiFetch('/evenements');
-    const events = (res.data || []).filter(eventBelongsToCurrentAerodrome);
-    return { source: 'backend', entries: events };
+    const events = res.data || [];
+    App.cachedEvents = events;
+    return { source: 'backend', entries: events, fromCache: false };
   } catch (e) {
     console.warn('[fetchArchiveEntries] /evenements indisponible, repli local :', e.message);
+    App.cachedEvents = null;
     return { source: 'local', entries: getLocalArchiveEntries() };
   }
 }
 
 /** Rendu de l'onglet Archive */
-async function renderArchiveTab() {
+async function renderArchiveTab(forceRefresh = false) {
   const tbody = document.getElementById('archive-list-tbody');
   const sourceNote = document.getElementById('archive-source-note');
   if (!tbody) return;
-  tbody.innerHTML = '<tr class="table-placeholder"><td colspan="6">Chargement du journal…</td></tr>';
+  tbody.innerHTML = '<tr class="table-placeholder"><td colspan="7">Chargement du journal…</td></tr>';
 
-  const { source, entries } = await fetchArchiveEntries();
+  const { source, entries, fromCache } = await fetchArchiveEntries(forceRefresh);
 
   if (sourceNote) {
+    const cacheNote = fromCache ? ' (données en cache — cliquer ACTUALISER pour rafraîchir)' : '';
     sourceNote.textContent = source === 'backend'
-      ? '✓ Journal officiel du serveur (GET /evenements)'
+      ? `✓ Journal officiel du serveur (GET /evenements)${cacheNote}`
       : '⚠ Journal local de secours (accès /evenements refusé ou indisponible — rôle Admin/Evaluator requis)';
     sourceNote.style.color = source === 'backend' ? 'var(--green)' : 'var(--amber)';
   }
 
   if (!entries.length) {
-    tbody.innerHTML = '<tr class="table-placeholder"><td colspan="6">Aucune action enregistrée pour cet aérodrome</td></tr>';
+    tbody.innerHTML = '<tr class="table-placeholder"><td colspan="7">Aucune action enregistrée</td></tr>';
     return;
   }
 
   if (source === 'backend') {
     tbody.innerHTML = entries.map(ev => {
-      const date = new Date(ev.createdAt);
-      const temporality = ev.type_action === 'CREATE' ? 'BASELINE' : (ev.type_action === 'DELETE' ? 'PERMDELTA' : 'PERMDELTA');
+      const date = new Date(ev.date_heure);
+      const auteur = ev.auteur || 'Système';
+      let actionClass = 'tag-info';
+      if (ev.action?.toLowerCase().includes('création')) actionClass = 'tag-pass';
+      if (ev.action?.toLowerCase().includes('suppression')) actionClass = 'tag-fail';
+      const propsMods = Array.isArray(ev.proprietes_modifiees) ? ev.proprietes_modifiees : [];
+      const summary = propsMods.length ? `Champs: ${propsMods.join(', ')}` : '—';
       return `<tr>
         <td class="mono" style="font-size:11px;">${date.toLocaleDateString('fr-FR')} ${date.toLocaleTimeString('fr-FR')}</td>
-        <td><span class="tag ${ACTION_TAG_BACKEND[ev.type_action] || 'tag-info'}">${ACTION_LABELS_BACKEND[ev.type_action] || ev.type_action}</span></td>
-        <td>${ev.collection_impactee}</td>
-        <td style="font-weight:600;">${resolveEventObjectName(ev)}</td>
-        <td style="font-size:11px;color:var(--text-secondary);" title="${ev.utilisateur_id?.email || ''}">${summarizeEventDiff(ev) || '—'}</td>
-        <td style="font-size:10.5px;color:var(--text-dim);" title="${TEMPORALITY_LABELS[temporality]}">${temporality}</td>
+        <td><span class="tag ${actionClass}">${ev.action || '—'}</span></td>
+        <td>${ev.collection || '—'}</td>
+        <td style="font-weight:600;">${ev.nom_semantique || '—'}</td>
+        <td style="font-size:11px;color:var(--text-secondary);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${summary}">${summary}</td>
+        <td style="font-size:11px;color:var(--text-dim);">${auteur}</td>
+        <td><button class="action-btn" style="font-size:10px; padding: 2px 6px;" onclick="showEventDetails('${ev.id}')">DÉTAILS</button></td>
       </tr>`;
     }).join('');
   } else {
@@ -216,9 +154,34 @@ async function renderArchiveTab() {
         <td>${e.objetType}</td>
         <td style="font-weight:600;">${e.objetNom}</td>
         <td style="font-size:11px;color:var(--text-secondary);">${e.detail || '—'}</td>
-        <td style="font-size:10.5px;color:var(--text-dim);" title="${TEMPORALITY_LABELS[e.temporality] || e.temporality}">${e.temporality}</td>
+        <td style="font-size:11px;color:var(--text-dim);">${e.user || '—'}</td>
+        <td></td>
       </tr>`;
     }).join('');
+  }
+}
+
+/** Affiche les détails d'un événement d'audit */
+async function showEventDetails(id) {
+  try {
+    const res = await apiFetch(`/evenements/${id}/detail`);
+    const ev = res.data;
+    const diffList = (ev.changements || []).map(c => `
+      <div style="margin-bottom:8px; border-bottom:1px solid var(--border-light); padding-bottom:8px;">
+        <div style="font-weight:bold; color:var(--text-main);">${c.propriete}</div>
+        <div style="display:flex; justify-content:space-between; margin-top:4px; font-size:12px;">
+          <div style="flex:1; color:var(--red); text-decoration:line-through; word-break:break-all; padding-right:8px;">
+            ${c.ancienne_valeur !== undefined ? JSON.stringify(c.ancienne_valeur) : 'N/A'}
+          </div>
+          <div style="flex:1; color:var(--green); word-break:break-all;">
+            ${c.nouvelle_valeur !== undefined ? JSON.stringify(c.nouvelle_valeur) : 'N/A'}
+          </div>
+        </div>
+      </div>
+    `).join('');
+    showModal("Détails de l'événement", `<div style="max-height: 400px; overflow-y:auto; overflow-x:hidden;">${diffList || 'Aucun détail technique'}</div>`);
+  } catch (e) {
+    showToast('Erreur lors du chargement des détails', 'error');
   }
 }
 

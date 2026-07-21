@@ -101,7 +101,7 @@ function normalizeAerodromeFromAPI(raw, pistesRaw) {
     elevation: raw.altitude || raw.elevation || 0,
     country: raw.pays || raw.country || '',
     city: raw.ville || raw.city || '',
-    iata: raw.iata || '',
+    iata: raw.code_iata || raw.iata || raw.codeIata || raw.iata_code || '',
     runways: runwaysFull,
   };
 }
@@ -112,10 +112,18 @@ function normalizeAerodromeFromAPI(raw, pistesRaw) {
  */
 function normalizeObstacleFromAPI(raw) {
   const coords = raw.geometrie?.coordinates;
+  let propRaw = raw.proprietaire || raw.owner || '';
+  let extractedExpiry = null;
+  const expMatch = propRaw.match(/__EXP:([^_]+)__/);
+  if (expMatch) {
+    extractedExpiry = expMatch[1];
+    propRaw = propRaw.replace(expMatch[0], '').trim();
+  }
+
   return {
     _id: raw._id,
     name: raw.nom || raw.name || '—',
-    proprietaire: raw.proprietaire || raw.owner || '',
+    proprietaire: propRaw,
     type: normalizeObsTypeBack(raw.type_obstacle || raw.type || ''),
     latitude: coords ? coords[1] : (raw.latitude ?? null),
     longitude: coords ? coords[0] : (raw.longitude ?? null),
@@ -125,11 +133,12 @@ function normalizeObstacleFromAPI(raw) {
     temporal: raw.type_temporel && ['permanent', 'temporary', 'construction'].includes(raw.type_temporel)
       ? raw.type_temporel
       : ((raw.permanence === 'Temporaire' || raw.temporal === 'temporary') ? 'temporary' : 'permanent'),
-    expiry: raw.date_expiration || raw.expiry || null,
+    expiry: raw.date_echeance || extractedExpiry || raw.date_expiration || raw.dateExpiration || raw.expiryDate || raw.date_fin_validite || raw.expiry || null,
     // Attributs ajoutés en v1.1 pour le suivi qualité (état de balisage, action
     // recommandée) — conservés côté client si le backend ne les renvoie pas encore.
     balisageEtat: raw.balisage_etat || raw.balisageEtat || null,
     actionRecommandee: raw.action_recommandee || raw.actionRecommandee || null,
+    createur: raw.createur || null,
     status: normalizeStatusBack(raw.statut_validation || raw.status || 'Draft'),
     aerodromeIcao: raw.aerodrome_id?.code_oaci || raw.aerodromeIcao || '',
     creatorId: (raw.createur_id && typeof raw.createur_id === 'object')

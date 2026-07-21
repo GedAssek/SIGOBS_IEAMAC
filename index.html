@@ -141,6 +141,7 @@
           <button class="tab-btn" id="tab-btn-runways" onclick="switchTab(this,'runways')">PISTES</button>
           <button class="tab-btn" id="tab-btn-aerodromes" onclick="switchTab(this,'aerodromes')">AÉRODROMES</button>
           <button class="tab-btn" id="tab-btn-archive" onclick="switchTab(this,'archive')">ARCHIVE</button>
+          <button class="tab-btn" id="tab-btn-corbeille" onclick="switchTab(this,'corbeille')">CORBEILLE</button>
           <button class="tab-btn" id="tab-btn-users" onclick="switchTab(this,'users')">UTILISATEURS</button>
         </nav>
       </div>
@@ -296,7 +297,7 @@
             <div class="info-row"><span>Désignation</span><span id="rwy-desig">—</span></div>
             <div class="info-row"><span>Longueur</span><span id="rwy-length">—</span></div>
             <div class="info-row"><span>Largeur</span><span id="rwy-width">—</span></div>
-            <div class="info-row"><span>Cap vrai</span><span id="rwy-bearing">—</span></div>
+            <!-- <div class="info-row"><span>Cap vrai</span><span id="rwy-bearing">—</span></div> -->
             <div class="info-row"><span>Élévation</span><span id="rwy-elev">—</span></div>
             <div class="info-row"><span>Code OACI</span><span id="rwy-code">—</span></div>
           </div>
@@ -328,17 +329,17 @@
     <!-- ══ TAB: OBSTACLES ══ -->
     <div id="tab-obstacles" class="tab-content">
       <div class="obstacles-page">
-        <div class="obs-page-header">
-          <div class="obs-filters">
+        <div class="obs-page-header" style="align-items: flex-start;">
+          <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; flex:1; min-width:300px;">
             <input id="obs-search" type="text" class="field-input" placeholder="Rechercher un obstacle…"
               oninput="filterObstacles()" style="width:220px;" />
-            <select id="obs-filter-status" class="field-select" onchange="filterObstacles()" style="width:160px;">
+            <select id="obs-filter-status" class="field-select" onchange="filterObstacles()" style="width:140px;">
               <option value="">Tous les statuts</option>
               <option value="draft">Brouillon</option>
               <option value="pending">En attente</option>
               <option value="validated">Validé</option>
             </select>
-            <select id="obs-filter-type" class="field-select" onchange="filterObstacles()" style="width:160px;">
+            <select id="obs-filter-type" class="field-select" onchange="filterObstacles()" style="width:140px;">
               <option value="">Tous les types</option>
               <option value="building">Bâtiment</option>
               <option value="tower">Tour / Pylône</option>
@@ -349,12 +350,12 @@
               <option value="water_tower">Château d'eau</option>
               <option value="other">Autre</option>
             </select>
-            <label class="toggle-label">
+            <label class="toggle-label" style="margin-left:4px;">
               <input type="checkbox" id="obs-filter-breach" onchange="filterObstacles()" />
-              <span>Pénétrations uniquement</span>
+              <span style="font-size:13px;">Pénétrations uniquement</span>
             </label>
           </div>
-          <div style="display:flex; gap:10px;">
+          <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;">
             <button class="btn-primary" onclick="openObstacleEntryPage()">
               <!--linear-gradient(135deg, var(--cyan), var(--cyan-dim))-->
               <svg viewBox="0 0 20 20" fill="none" width="14" height="14">
@@ -391,7 +392,7 @@
             </button>
           </div>
         </div>
-        <div class="table-wrap" style="flex:1;max-height:none;">
+        <div class="table-wrap" style="flex:1; max-height:none; border-radius:6px 6px 0 0; border-bottom:none;">
           <table class="data-table">
             <thead>
               <tr id="obs-table-head">
@@ -403,6 +404,7 @@
                 <th>ALT. (m)</th>
                 <th>HAUT. (m)</th>
                 <th>TEMPOREL</th>
+                <th id="obs-col-echeance">ÉCHÉANCE</th>
                 <th>VERDICT OLS</th>
                 <th>DÉGAGEMENT</th>
                 <th>SURFACE CONCERNÉE</th>
@@ -418,6 +420,12 @@
               </tr>
             </tbody>
           </table>
+        </div>
+        <div id="obstacles-pagination" class="pagination-controls"
+          style="display:flex; justify-content:center; align-items:center; gap:20px; padding:14px 20px; background:linear-gradient(180deg, #FFFFFF 0%, #FAFCFF 100%); border:1px solid rgba(14,165,233,0.12); border-top:none; border-radius:0 0 8px 8px; box-shadow:0 2px 8px rgba(15,23,42,0.04);">
+          <button id="btn-prev-page" class="btn-ghost" style="min-width:120px; border-radius:20px; font-size:12.5px; font-weight:600; padding:7px 16px; letter-spacing:0.02em;" onclick="changeObstaclesPage(-1)" disabled>← Précédent</button>
+          <span id="pagination-info" style="font-size:12.5px; color:var(--text-secondary); font-weight:700; background:var(--bg-subtle); padding:5px 14px; border-radius:20px; border:1px solid rgba(148,163,184,0.25); letter-spacing:0.03em;">Page 1 sur 1</span>
+          <button id="btn-next-page" class="btn-ghost" style="min-width:120px; border-radius:20px; font-size:12.5px; font-weight:600; padding:7px 16px; letter-spacing:0.02em;" onclick="changeObstaclesPage(1)" disabled>Suivant →</button>
         </div>
       </div>
     </div><!-- /tab-obstacles -->
@@ -1051,9 +1059,8 @@
         <div class="oe-section">
           <div class="oe-section-title">JOURNAL DES ACTIONS </div>
           <p style="font-size:11px; color:var(--text-dim); line-height:1.5; margin:6px 0 0;">
-            ℹ️ Source : journal officiel du serveur (<code>GET /evenements</code>), réservé aux rôles
-            Admin et Evaluator. En cas d'indisponibilité ou de rôle insuffisant, un journal local de
-            secours (par navigateur) prend le relais — la source active est indiquée ci-dessous.
+            ℹ️ Source : Le journal officiel du serveur est réservé aux rôles
+            Admin et Evaluator.
           </p>
         </div>
 
@@ -1063,7 +1070,7 @@
             <span id="archive-source-note" style="font-size:11px;"></span>
           </div>
           <div style="display:flex; gap:8px;">
-            <button class="btn-ghost btn-sm" onclick="renderArchiveTab()">ACTUALISER</button>
+            <button class="btn-ghost btn-sm" onclick="renderArchiveTab(true)">ACTUALISER</button>
             <button class="btn-ghost btn-sm" onclick="clearArchive()" style="color:var(--red);">VIDER LE JOURNAL
               LOCAL</button>
           </div>
@@ -1078,18 +1085,54 @@
                 <th>TYPE</th>
                 <th>OBJET</th>
                 <th>DÉTAIL</th>
-                <!-- <th>TEMPORALITÉ AIXM 5.2</th>-->
+                <th>AUTEUR</th>
+                <th>ACTIONS</th>
               </tr>
             </thead>
             <tbody id="archive-list-tbody">
               <tr class="table-placeholder">
-                <td colspan="6">Chargement…</td>
+                <td colspan="7">Chargement…</td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
     </div><!-- /tab-archive -->
+
+    <!-- ══ TAB: CORBEILLE ══ -->
+    <div id="tab-corbeille" class="tab-content">
+      <div
+        style="display:flex; flex-direction:column; height:100%; padding:16px; gap:12px; overflow-y:auto; background:var(--bg-main);">
+        <div class="section-header"
+          style="margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+          <span class="section-title" style="font-size:14px;">CORBEILLE (ÉLÉMENTS SUPPRIMÉS)</span>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <select id="corbeille-type-select" class="field-select inline-select"
+              style="font-size:12px; padding:4px 8px;" onchange="loadCorbeille()">
+              <option value="obstacles">Obstacles</option>
+              <option value="aerodromes">Aérodromes</option>
+              <option value="pistes">Pistes</option>
+              <option value="utilisateurs">Utilisateurs</option>
+            </select>
+            <button class="btn-ghost btn-sm" onclick="loadCorbeille()">ACTUALISER</button>
+          </div>
+        </div>
+        <div class="table-wrap" style="flex:1; max-height:none;">
+          <table class="data-table" style="width:100%;">
+            <thead>
+              <tr id="corbeille-thead-tr">
+                <!-- Dynamique selon le type -->
+              </tr>
+            </thead>
+            <tbody id="corbeille-list-tbody">
+              <tr class="table-placeholder">
+                <td colspan="5">Veuillez sélectionner un type et actualiser…</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
 
     <!-- ══ TAB: USERS ══ -->
     <div id="tab-users" class="tab-content">
@@ -1333,6 +1376,7 @@
   <script src="obstacles-csv-import.js?v=1.1"></script> <!-- 8. Import CSV par lot d'obstacles -->
   <script src="obstacles-suivi.js"></script> <!-- 8b. Tableau de suivi des obstacles (style tableur) -->
   <script src="runways.js"></script> <!-- 9. Gestion pistes -->
+  <script src="corbeille.js"></script> <!-- Corbeille et Restauration -->
   <script src="users.js"></script> <!-- 10. Gestion utilisateurs -->
   <script src="surfaces.js"></script> <!-- 11. Surfaces OLS backend → MapLibre -->
   <script src="map.js"></script> <!-- 12. Carte MapLibre, couches, tooltips -->
