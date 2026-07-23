@@ -32,15 +32,18 @@ async function loadAllAerodromes() {
   const isEvaluator = typeof getIsEvaluator === 'function' ? getIsEvaluator() : false;
   
   try {
-    if (isAdmin || isEvaluator) {
-      // Les Admins et Evaluators peuvent lister tous les aérodromes
+    // On essaie de récupérer la liste complète des aérodromes autorisés pour cet utilisateur
+    // Le backend devrait filtrer automatiquement selon le rôle, ou renvoyer 403 si interdit.
+    try {
       const res = await apiFetch('/aerodromes');
       App.aerodromesList = res.data || [];
-    } else {
-      // Utilisateur standard : liste limitée à ce qui est explicitement autorisé
-      const authorised = App.user?.aerodromes_autorises;
+    } catch (apiErr) {
+      // Fallback si l'API refuse l'accès global à la liste : on utilise les données du token
+      if (isAdmin || isEvaluator) throw apiErr; // Les admins DEVRAIENT y avoir accès
+      
+      const authorised = App.user?.aerodromes || App.user?.aerodromes_autorises;
       if (Array.isArray(authorised) && authorised.length) {
-        App.aerodromesList = authorised.map(a => (typeof a === 'object' ? a : { _id: a }));
+        App.aerodromesList = authorised.map(a => (typeof a === 'object' ? a : { _id: a, nom: 'Aérodrome autorisé', code_oaci: 'ID' }));
       } else if (App.aerodrome) {
         App.aerodromesList = [{ _id: App.aerodromeMongoId, code_oaci: App.aerodrome.icao, nom: App.aerodrome.name }];
       }
@@ -52,7 +55,12 @@ async function loadAllAerodromes() {
     }
   }
   renderAerodromeSwitcher();
-  if (isAdmin || isEvaluator) renderAerodromesAdminList();
+  // On autorise maintenant les non-admins ayant des aérodromes à voir la liste pour switcher
+  if (isAdmin || isEvaluator || (App.aerodromesList && App.aerodromesList.length > 0)) {
+    const btnAerodromes = document.getElementById('tab-btn-aerodromes');
+    if (btnAerodromes) btnAerodromes.style.display = 'block';
+    renderAerodromesAdminList();
+  }
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -141,10 +149,21 @@ function renderAerodromesAdminList() {
 
   if (!App.aerodromesList.length) {
     container.innerHTML = '<div class="empty-msg">Aucun aérodrome enregistré</div>';
+    updateAerodromesPaginationUI();
     return;
   }
 
-  container.innerHTML = App.aerodromesList.map(a => {
+  App.aerodromesCurrentPage = App.aerodromesCurrentPage || 1;
+  App.aerodromesTotalPages = Math.ceil(App.aerodromesList.length / 25) || 1;
+  
+  if (App.aerodromesCurrentPage > App.aerodromesTotalPages) {
+    App.aerodromesCurrentPage = App.aerodromesTotalPages;
+  }
+  
+  const start = (App.aerodromesCurrentPage - 1) * 25;
+  const paginatedAerodromes = App.aerodromesList.slice(start, start + 25);
+
+  container.innerHTML = paginatedAerodromes.map(a => {
     const id = a._id;
     const isCurrent = id === App.currentAerodromeId;
     return `
@@ -157,12 +176,42 @@ function renderAerodromesAdminList() {
       </div>
       <div class="runway-mgmt-actions">
         ${!isCurrent ? `<button class="action-btn" onclick="switchAerodrome('${id}')">SÉLECTIONNER</button>` : ''}
-        <button class="action-btn" onclick="openEditAerodromeModal('${id}')">ÉDITER</button>
-        ${isAdmin ? `<button class="action-btn" onclick="openGrantAccessModal('${id}','${(a.code_oaci || a.icao || '').replace(/'/g, "\\'")}')">GÉRER LES ACCÈS</button>
+        ${isAdmin ? `<button class="action-btn" onclick="openEditAerodromeModal('${id}')">ÉDITER</button>
+                     <button class="action-btn" onclick="openGrantAccessModal('${id}','${(a.code_oaci || a.icao || '').replace(/'/g, "\\'")}')">GÉRER LES ACCÈS</button>
                      <button class="action-btn delete" onclick="confirmDeleteAerodrome('${id}', '${(a.code_oaci || a.icao || '').replace(/'/g, "\\'")}')" title="Supprimer">✕</button>` : ''}
       </div>
     </div>`;
   }).join('');
+  
+  updateAerodromesPaginationUI();
+}
+
+function updateAerodromesPaginationUI() {
+  const paginationDiv = document.getElementById('aerodromes-pagination');
+  const info = document.getElementById('aerodromes-pagination-info');
+  if (!paginationDiv) return;
+  
+  paginationDiv.style.display = 'flex';
+  if (info) info.textContent = `Page ${App.aerodromesCurrentPage} sur ${App.aerodromesTotalPages}`;
+  
+  const btnPrev = paginationDiv.querySelector('button:first-child');
+  const btnNext = paginationDiv.querySelector('button:last-child');
+  if (btnPrev) btnPrev.disabled = App.aerodromesCurrentPage <= 1;
+  if (btnNext) btnNext.disabled = App.aerodromesCurrentPage >= App.aerodromesTotalPages;
+}
+
+function nextAerodromesPage() {
+  if (App.aerodromesCurrentPage < App.aerodromesTotalPages) {
+    App.aerodromesCurrentPage++;
+    renderAerodromesAdminList();
+  }
+}
+
+function prevAerodromesPage() {
+  if (App.aerodromesCurrentPage > 1) {
+    App.aerodromesCurrentPage--;
+    renderAerodromesAdminList();
+  }
 }
 
 async function confirmDeleteAerodrome(id, icao) {

@@ -964,6 +964,15 @@
           <div id="runways-mgmt-list" style="display:flex; flex-direction:column; gap:10px;">
             <div class="table-placeholder">Chargement des pistes…</div>
           </div>
+          <div id="runways-pagination" class="pagination-controls" style="display:none; margin-top:20px; justify-content:center; align-items:center; gap:15px; border-top:1px solid var(--border-light); padding-top:15px;">
+            <button class="btn-ghost btn-sm" onclick="prevRunwaysPage()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> PRÉCÉDENT
+            </button>
+            <span id="runways-pagination-info" style="font-size:12.5px; color:var(--text-secondary); font-weight:700; background:var(--bg-subtle); padding:5px 14px; border-radius:20px; border:1px solid rgba(148,163,184,0.25);">Page 1 sur 1</span>
+            <button class="btn-ghost btn-sm" onclick="nextRunwaysPage()">
+              SUIVANT <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+          </div>
         </main>
       </div>
     </div><!-- /tab-runways -->
@@ -1049,6 +1058,15 @@
           <div id="aerodromes-mgmt-list" style="display:flex; flex-direction:column; gap:10px;">
             <div class="table-placeholder">Chargement des aérodromes…</div>
           </div>
+          <div id="aerodromes-pagination" class="pagination-controls" style="display:none; margin-top:20px; justify-content:center; align-items:center; gap:15px; border-top:1px solid var(--border-light); padding-top:15px;">
+            <button class="btn-ghost btn-sm" onclick="prevAerodromesPage()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> PRÉCÉDENT
+            </button>
+            <span id="aerodromes-pagination-info" style="font-size:12.5px; color:var(--text-secondary); font-weight:700; background:var(--bg-subtle); padding:5px 14px; border-radius:20px; border:1px solid rgba(148,163,184,0.25);">Page 1 sur 1</span>
+            <button class="btn-ghost btn-sm" onclick="nextAerodromesPage()">
+              SUIVANT <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+          </div>
         </main>
       </div>
     </div><!-- /tab-aerodromes -->
@@ -1096,6 +1114,15 @@
             </tbody>
           </table>
         </div>
+        <div id="archive-pagination" class="pagination-controls" style="display:none; margin-top:10px; justify-content:center; align-items:center; gap:15px;">
+          <button class="btn-ghost btn-sm" onclick="prevArchivePage()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> PRÉCÉDENT
+          </button>
+          <span id="archive-pagination-info" style="font-size:12.5px; color:var(--text-secondary); font-weight:700; background:var(--bg-subtle); padding:5px 14px; border-radius:20px; border:1px solid rgba(148,163,184,0.25);">Page 1 sur 1</span>
+          <button class="btn-ghost btn-sm" onclick="nextArchivePage()">
+            SUIVANT <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
       </div>
     </div><!-- /tab-archive -->
 
@@ -1130,6 +1157,15 @@
               </tr>
             </tbody>
           </table>
+          <div id="corbeille-pagination" class="pagination-controls" style="display:none; margin-top:15px; justify-content:center; align-items:center; gap:15px; padding-bottom:15px;">
+            <button class="btn-ghost btn-sm" onclick="prevCorbeillePage()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> PRÉCÉDENT
+            </button>
+            <span id="corbeille-pagination-info" style="font-size:12.5px; color:var(--text-secondary); font-weight:700; background:var(--bg-subtle); padding:5px 14px; border-radius:20px; border:1px solid rgba(148,163,184,0.25);">Page 1 sur 1</span>
+            <button class="btn-ghost btn-sm" onclick="nextCorbeillePage()">
+              SUIVANT <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1191,6 +1227,15 @@
               </tr>
             </tbody>
           </table>
+          <div id="users-pagination" class="pagination-controls" style="display:none; margin-top:20px; justify-content:center; align-items:center; gap:15px; border-top:1px solid var(--border-light); padding-top:15px;">
+            <button class="btn-ghost btn-sm" onclick="prevUsersPage()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> PRÉCÉDENT
+            </button>
+            <span id="users-pagination-info" style="font-size:12.5px; color:var(--text-secondary); font-weight:700; background:var(--bg-subtle); padding:5px 14px; border-radius:20px; border:1px solid rgba(148,163,184,0.25);">Page 1 sur 1</span>
+            <button class="btn-ghost btn-sm" onclick="nextUsersPage()">
+              SUIVANT <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+          </div>
         </main>
       </div>
     </div><!-- /tab-users -->

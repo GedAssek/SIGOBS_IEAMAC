@@ -12,7 +12,7 @@
    STATUT AÉRODROME D'ÉTUDE
 ══════════════════════════════════════════════════════════ */
 function setAerodromeStatus(state, msg) {
-  const dot    = document.getElementById('study-status-dot');
+  const dot = document.getElementById('study-status-dot');
   const nameEl = document.getElementById('study-name');
   if (dot) dot.className = `study-status-dot ${state}`;
   if (state === 'loading' && nameEl && !App.aerodrome) nameEl.textContent = msg || 'Chargement…';
@@ -33,14 +33,42 @@ async function loadStudyAerodrome() {
   //  2. Aérodrome associé au compte utilisateur (App.user.aerodrome_id)
   //  3. Aérodrome OACI par défaut historique (mono-aérodrome)
   const savedId = sessionStorage.getItem('sigobs_aerodrome_id');
-  const userAerodromeId = (App.user?.aerodrome_id && typeof App.user.aerodrome_id === 'object')
+
+  let userAerodromeId = (App.user?.aerodrome_id && typeof App.user.aerodrome_id === 'object')
     ? App.user.aerodrome_id._id
     : App.user?.aerodrome_id;
 
-  if (savedId) {
+  const aeroArray = App.aerodromesList && App.aerodromesList.length > 0 ? App.aerodromesList : (App.user?.aerodromes || App.user?.aerodromes_autorises || []);
+  if (!userAerodromeId && aeroArray.length > 0) {
+    userAerodromeId = typeof aeroArray[0] === 'object' ? aeroArray[0]._id : aeroArray[0];
+  }
+
+  const roleRaw = App.user?.role;
+  const roleName = typeof roleRaw === 'object' ? roleRaw.nomRole || roleRaw.name : roleRaw;
+  const isAdmin = roleName && roleName.toLowerCase().includes('admin');
+
+  let finalId = null;
+
+  if (isAdmin) {
+    // Les admins peuvent utiliser le savedId de la session précédente
+    finalId = savedId || userAerodromeId;
+  } else {
+    // Pour les non-admins, l'aérodrome de l'utilisateur a TOUJOURS la priorité sur le cache
+    // Sauf si le savedId fait explicitement partie de ses aérodromes autorisés (cas multi-aérodromes non-admin)
+    finalId = userAerodromeId;
+    if (savedId) {
+      const allowedIds = aeroArray.map(a => typeof a === 'object' ? a._id : a);
+      if (userAerodromeId && !allowedIds.includes(userAerodromeId)) allowedIds.push(userAerodromeId);
+      if (allowedIds.includes(savedId)) {
+        finalId = savedId;
+      }
+    }
+  }
+
+  if (finalId) {
+    await loadAerodromeById(finalId);
+  } else if (savedId && isAdmin) { // Sécurité supplémentaire
     await loadAerodromeById(savedId);
-  } else if (userAerodromeId) {
-    await loadAerodromeById(userAerodromeId);
   } else {
     await loadAerodromeByIcao(STUDY_AERODROME_ICAO);
   }
@@ -81,9 +109,19 @@ async function loadAerodromeById(id, raw) {
         const res = await apiFetch('/aerodromes/' + id);
         raw = res.data || res; // certains backends renvoient le document directement
       } catch (e) {
-        console.warn('[loadAerodromeById] GET /aerodromes/:id indisponible, repli sur l\'aérodrome par défaut', e.message);
+        console.warn('[loadAerodromeById] GET /aerodromes/:id indisponible', e.message);
         sessionStorage.removeItem('sigobs_aerodrome_id');
-        return loadAerodromeByIcao(STUDY_AERODROME_ICAO);
+
+        const roleRaw = App.user?.role;
+        const roleName = typeof roleRaw === 'object' ? roleRaw.nomRole || roleRaw.name : roleRaw;
+        const isAdmin = roleName && roleName.toLowerCase().includes('admin');
+
+        if (isAdmin) {
+          console.warn('[loadAerodromeById] Repli sur l\'aérodrome par défaut pour admin');
+          return loadAerodromeByIcao(STUDY_AERODROME_ICAO);
+        } else {
+          throw new Error('Vous n\'avez pas accès à cet aérodrome ou il a été supprimé.');
+        }
       }
     }
 
@@ -120,10 +158,17 @@ async function loadAerodromeById(id, raw) {
   }
 }
 
-/** Bascule l'aérodrome d'étude courant (appelé depuis le sélecteur de la topbar) */
+/** Bascule l'aérodrome d'étude courant (appelé depuis le sélecteur de la topbar ou la liste) */
 async function switchAerodrome(id) {
   if (!id || id === App.currentAerodromeId) return;
   await loadAerodromeById(id);
+  // Mettre à jour la liste dans l'onglet AÉRODROMES pour refléter le nouvel aérodrome courant
+  if (typeof renderAerodromesAdminList === 'function') {
+    const btnAerodromes = document.getElementById('tab-btn-aerodromes');
+    if (btnAerodromes && btnAerodromes.style.display !== 'none') {
+      renderAerodromesAdminList();
+    }
+  }
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -131,17 +176,17 @@ async function switchAerodrome(id) {
 ══════════════════════════════════════════════════════════ */
 function applyAerodromeToUI(schema) {
   App.aerodrome = schema;
-  App.runways   = schema.runways || [];
+  App.runways = schema.runways || [];
 
   const icaoEl = document.getElementById('study-icao');
   const nameEl = document.getElementById('study-name');
   const elevEl = document.getElementById('study-elev');
-  const dotEl  = document.getElementById('study-status-dot');
+  const dotEl = document.getElementById('study-status-dot');
 
   if (icaoEl) icaoEl.textContent = schema.icao || '—';
   if (nameEl) nameEl.textContent = `${schema.name}${schema.iata ? '  (' + schema.iata + ')' : ''}`;
   if (elevEl) elevEl.textContent = `ELEV ${schema.elevation != null ? (schema.elevation * 0.3048).toFixed(0) : '—'} m  ·  ${schema.city || schema.country || ''}`;
-  if (dotEl)  dotEl.className    = 'study-status-dot ready';
+  if (dotEl) dotEl.className = 'study-status-dot ready';
 
   const aeroInfoDiv = document.getElementById('aerodrome-info');
   if (aeroInfoDiv) aeroInfoDiv.classList.remove('hidden');
@@ -164,9 +209,9 @@ function applyAerodromeToUI(schema) {
 /** Construit les onglets de sélection de piste dans la barre runway */
 function buildRunwayTabs() {
   const container = document.getElementById('runway-tabs');
-  const meta      = document.getElementById('runway-meta');
+  const meta = document.getElementById('runway-meta');
   container.innerHTML = '';
-  meta.innerHTML      = '';
+  meta.innerHTML = '';
 
   if (!App.runways.length) {
     container.innerHTML = '<span class="no-runway-msg">— Aucune piste disponible —</span>';

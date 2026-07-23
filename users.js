@@ -71,8 +71,9 @@ async function loadUsers() {
     if (!_cachedRoles.length) await loadRoles();
     populateUserAerodromes(); // Remplir la liste d'aérodromes pour la création
     const res   = await apiFetch('/utilisateurs');
-    const users = res.data || [];
-    renderUsersList(users);
+    App.usersList = res.data || [];
+    App.usersCurrentPage = 1;
+    renderUsersList();
   } catch (e) {
     console.warn('[loadUsers]', e.message);
     if (tbody) tbody.innerHTML = '<tr class="table-placeholder"><td colspan="4">Erreur de chargement</td></tr>';
@@ -80,15 +81,25 @@ async function loadUsers() {
   }
 }
 
-/** Génère le tableau HTML des utilisateurs */
-function renderUsersList(users) {
+/** Génère le tableau HTML des utilisateurs (paginé) */
+function renderUsersList() {
   const tbody = document.getElementById('users-list-tbody');
   if (!tbody) return;
+  const users = App.usersList || [];
   if (!users.length) {
     tbody.innerHTML = '<tr class="table-placeholder"><td colspan="4">Aucun utilisateur trouvé</td></tr>';
+    updateUsersPaginationUI();
     return;
   }
-  tbody.innerHTML = users.map(u => {
+  
+  App.usersCurrentPage = App.usersCurrentPage || 1;
+  App.usersTotalPages = Math.ceil(users.length / 25) || 1;
+  if (App.usersCurrentPage > App.usersTotalPages) App.usersCurrentPage = App.usersTotalPages;
+  
+  const start = (App.usersCurrentPage - 1) * 25;
+  const paginated = users.slice(start, start + 25);
+  
+  tbody.innerHTML = paginated.map(u => {
     const roleRef = u.role || u.role_id;
     let roleLabel = '—';
     if (typeof roleRef === 'object' && roleRef !== null) {
@@ -121,6 +132,36 @@ function renderUsersList(users) {
       </td>
     </tr>`;
   }).join('');
+  
+  updateUsersPaginationUI();
+}
+
+function updateUsersPaginationUI() {
+  const paginationDiv = document.getElementById('users-pagination');
+  const info = document.getElementById('users-pagination-info');
+  if (!paginationDiv) return;
+  
+  paginationDiv.style.display = 'flex';
+  if (info) info.textContent = `Page ${App.usersCurrentPage} sur ${App.usersTotalPages}`;
+  
+  const btnPrev = paginationDiv.querySelector('button:first-child');
+  const btnNext = paginationDiv.querySelector('button:last-child');
+  if (btnPrev) btnPrev.disabled = App.usersCurrentPage <= 1;
+  if (btnNext) btnNext.disabled = App.usersCurrentPage >= App.usersTotalPages;
+}
+
+function nextUsersPage() {
+  if (App.usersCurrentPage < App.usersTotalPages) {
+    App.usersCurrentPage++;
+    renderUsersList();
+  }
+}
+
+function prevUsersPage() {
+  if (App.usersCurrentPage > 1) {
+    App.usersCurrentPage--;
+    renderUsersList();
+  }
 }
 
 /** 

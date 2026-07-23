@@ -20,8 +20,12 @@ async function apiFetch(path, method = 'GET', body = null, auth = true) {
   if (!res.ok) {
     let msg = data.message || `HTTP ${res.status}`;
     // Si c'est une erreur de validation avec un tableau de détails/errors
-    if (data.errors && Array.isArray(data.errors)) {
-      msg += ' : ' + data.errors.map(e => `${e.path?.join('.') || e.field || 'champ'}: ${e.message}`).join(', ');
+    if (data.errors) {
+      if (Array.isArray(data.errors)) {
+        msg += ' : ' + data.errors.map(e => `${e.path?.join('.') || e.field || 'champ'}: ${e.message}`).join(', ');
+      } else if (typeof data.errors === 'object') {
+        msg += ' : ' + Object.entries(data.errors).map(([k, v]) => `${k}: ${v.message || v}`).join(', ');
+      }
     } else if (data.details && Array.isArray(data.details)) {
       msg += ' : ' + data.details.map(e => e.message).join(', ');
     }

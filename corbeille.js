@@ -34,15 +34,62 @@ async function loadCorbeille() {
 
   try {
     const res = await apiFetch(`/${type}/deleted`);
-    const data = res.data || [];
-
-    if (!data.length) {
-      tbody.innerHTML = `<tr class="table-placeholder"><td colspan="5">Aucun élément supprimé trouvé.</td></tr>`;
-      return;
+    let data = res.data || [];
+    
+    // Filtrage local pour les non-admins : restreindre aux aérodromes autorisés
+    const isAdmin = typeof getIsAdmin === 'function' ? getIsAdmin() : false;
+    const isEvaluator = typeof getIsEvaluator === 'function' ? getIsEvaluator() : false;
+    
+    if (!isAdmin && !isEvaluator) {
+      if (type === 'obstacles' || type === 'pistes') {
+        const allowedIds = (App.aerodromesList || []).map(a => a._id);
+        if (allowedIds.length > 0) {
+          data = data.filter(item => {
+            const aeroId = typeof item.aerodrome_id === 'object' ? item.aerodrome_id?._id : item.aerodrome_id;
+            return allowedIds.includes(aeroId);
+          });
+        } else {
+          data = [];
+        }
+      } else {
+        // Un non-admin n'a pas accès aux aérodromes/utilisateurs supprimés
+        data = [];
+      }
     }
 
-    let rowsHtml = '';
-    data.forEach(item => {
+    App.corbeilleList = data;
+    App.corbeilleCurrentType = type;
+    App.corbeilleCurrentPage = 1;
+    renderCorbeilleList();
+  } catch (e) {
+    console.error('[loadCorbeille]', e);
+    tbody.innerHTML = `<tr class="table-placeholder"><td colspan="5" style="color:var(--danger);">Erreur : ${e.message}</td></tr>`;
+  }
+}
+
+function renderCorbeilleList() {
+  const tbody = document.getElementById('corbeille-list-tbody');
+  if (!tbody) return;
+  const data = App.corbeilleList || [];
+  const type = App.corbeilleCurrentType;
+
+  if (!data.length) {
+    tbody.innerHTML = `<tr class="table-placeholder"><td colspan="5">Aucun élément supprimé trouvé.</td></tr>`;
+    App.corbeilleCurrentPage = 1;
+    App.corbeilleTotalPages = 1;
+    updateCorbeillePaginationUI();
+    return;
+  }
+  
+  App.corbeilleCurrentPage = App.corbeilleCurrentPage || 1;
+  App.corbeilleTotalPages = Math.ceil(data.length / 25) || 1;
+  if (App.corbeilleCurrentPage > App.corbeilleTotalPages) App.corbeilleCurrentPage = App.corbeilleTotalPages;
+  
+  const start = (App.corbeilleCurrentPage - 1) * 25;
+  const paginated = data.slice(start, start + 25);
+
+  let rowsHtml = '';
+  paginated.forEach(item => {
       rowsHtml += '<tr>';
       
       switch (type) {
@@ -83,9 +130,34 @@ async function loadCorbeille() {
     });
 
     tbody.innerHTML = rowsHtml;
-  } catch (e) {
-    console.error('[loadCorbeille]', e);
-    tbody.innerHTML = `<tr class="table-placeholder"><td colspan="5" style="color:var(--danger);">Erreur : ${e.message}</td></tr>`;
+    updateCorbeillePaginationUI();
+}
+
+function updateCorbeillePaginationUI() {
+  const paginationDiv = document.getElementById('corbeille-pagination');
+  const info = document.getElementById('corbeille-pagination-info');
+  if (!paginationDiv) return;
+  
+  paginationDiv.style.display = 'flex';
+  if (info) info.textContent = `Page ${App.corbeilleCurrentPage} sur ${App.corbeilleTotalPages}`;
+  
+  const btnPrev = paginationDiv.querySelector('button:first-child');
+  const btnNext = paginationDiv.querySelector('button:last-child');
+  if (btnPrev) btnPrev.disabled = App.corbeilleCurrentPage <= 1;
+  if (btnNext) btnNext.disabled = App.corbeilleCurrentPage >= App.corbeilleTotalPages;
+}
+
+function nextCorbeillePage() {
+  if (App.corbeilleCurrentPage < App.corbeilleTotalPages) {
+    App.corbeilleCurrentPage++;
+    renderCorbeilleList();
+  }
+}
+
+function prevCorbeillePage() {
+  if (App.corbeilleCurrentPage > 1) {
+    App.corbeilleCurrentPage--;
+    renderCorbeilleList();
   }
 }
 

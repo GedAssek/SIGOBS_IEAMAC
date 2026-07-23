@@ -72,28 +72,89 @@ const TEMPORALITY_LABELS = {
 
 // Fonctions obsolètes supprimées (summarizeEventDiff, resolveEventObjectName, eventBelongsToCurrentAerodrome)
 
+App.archiveCurrentPage = App.archiveCurrentPage || 1;
+App.archiveTotalPages = App.archiveTotalPages || 1;
+
 /**
  * Récupère les événements d'audit depuis le backend (GET /evenements),
- * filtrés sur l'aérodrome courant. Retombe sur le journal local si
- * l'utilisateur n'a pas le rôle requis (403) ou en cas d'erreur réseau.
- * Stocke le résultat dans App.cachedEvents pour un accès instantané
- * depuis l'historique par obstacle (sans re-fetch).
+ * avec prise en charge de la pagination.
  */
 async function fetchArchiveEntries(forceRefresh = false) {
-  // Utiliser le cache si disponible et pas de rafraîchissement forcé
-  if (!forceRefresh && App.cachedEvents && App.cachedEvents.length > 0) {
-    return { source: 'backend', entries: App.cachedEvents, fromCache: true };
+  // Client-side pagination strategy: fetch all (or large number) once, then paginate
+  if (!forceRefresh && App.allArchiveEvents) {
+    const start = (App.archiveCurrentPage - 1) * 25;
+    const paginated = App.allArchiveEvents.slice(start, start + 25);
+    return { source: 'backend', entries: paginated, fromCache: true };
   }
+  
   try {
-    const res = await apiFetch('/evenements');
-    const events = res.data || [];
-    App.cachedEvents = events;
-    return { source: 'backend', entries: events, fromCache: false };
+    // Attempt to fetch a large number to ensure we have all elements for client-side pagination
+    const res = await apiFetch(`/evenements?limit=10000&size=10000&per_page=10000`);
+    const events = res.data || (Array.isArray(res) ? res : []);
+    
+    App.allArchiveEvents = events;
+    App.archiveTotalPages = Math.ceil(events.length / 25) || 1;
+    
+    if (App.archiveCurrentPage > App.archiveTotalPages) App.archiveCurrentPage = App.archiveTotalPages;
+    const start = (App.archiveCurrentPage - 1) * 25;
+    const paginated = events.slice(start, start + 25);
+    
+    return { source: 'backend', entries: paginated, fromCache: false };
   } catch (e) {
     console.warn('[fetchArchiveEntries] /evenements indisponible, repli local :', e.message);
-    App.cachedEvents = null;
-    return { source: 'local', entries: getLocalArchiveEntries() };
+    const local = getLocalArchiveEntries();
+    App.archiveTotalPages = Math.ceil(local.length / 25) || 1;
+    if (App.archiveCurrentPage > App.archiveTotalPages) App.archiveCurrentPage = App.archiveTotalPages;
+    
+    const start = (App.archiveCurrentPage - 1) * 25;
+    const paginatedLocal = local.slice(start, start + 25);
+    return { source: 'local', entries: paginatedLocal };
   }
+}
+
+function updateArchivePaginationUI() {
+  const paginationDiv = document.getElementById('archive-pagination');
+  const info = document.getElementById('archive-pagination-info');
+  if (!paginationDiv) return;
+  
+  paginationDiv.style.display = 'flex';
+  if (info) info.textContent = `Page ${App.archiveCurrentPage} sur ${App.archiveTotalPages}`;
+  
+  const btnPrev = paginationDiv.querySelector('button:first-child');
+  const btnNext = paginationDiv.querySelector('button:last-child');
+  if (btnPrev) btnPrev.disabled = App.archiveCurrentPage <= 1;
+  if (btnNext) btnNext.disabled = App.archiveCurrentPage >= App.archiveTotalPages;
+}
+
+async function nextArchivePage() {
+  if (App.archiveCurrentPage < App.archiveTotalPages) {
+    App.archiveCurrentPage++;
+    await renderArchiveTab(true);
+  }
+}
+
+async function prevArchivePage() {
+  if (App.archiveCurrentPage > 1) {
+    App.archiveCurrentPage--;
+    await renderArchiveTab(true);
+  }
+}
+
+const INTERNAL_KEYS = ['_id', '__v', 'createdAt', 'updatedAt', 'id', 'is_deleted', 'aerodrome_id', 'piste_id', 'document_id', 'utilisateur_id', 'balisage'];
+
+/** Formate une clé technique en libellé lisible pour l'utilisateur */
+function formatEventKey(k) {
+  const labels = {
+    'geometrie': 'Position (Coordonnées)', 'altitude_max': 'Altitude Maximum (m)', 'hauteur': 'Hauteur (m)',
+    'zone_de_couverture': 'Zone de couverture', 'frangibilite': 'Frangible', 'statut_validation': 'Statut',
+    'nom': 'Nom', 'type_obstacle': "Type d'obstacle", 'precision': 'Précision', 'source': 'Source',
+    'mobilite': 'Mobilité', 'permanence': 'Permanence', 'id_visible': 'Identifiant Visible',
+    'proprietaire': 'Propriétaire', 'description': 'Description', 'date_recensement': 'Date du relevé',
+    'qfu_1': 'QFU 1', 'qfu_2': 'QFU 2', 'longueur': 'Longueur (m)', 'largeur': 'Largeur (m)',
+    'code_reference': 'Code de référence', 'altitude': 'Altitude', 'var': 'Déclinaison magnétique',
+    'ville': 'Ville', 'code_oaci': 'Code OACI', 'code_iata': 'Code IATA', 'pays': 'Pays'
+  };
+  return labels[k] || k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, ' ');
 }
 
 /** Rendu de l'onglet Archive */
@@ -103,7 +164,7 @@ async function renderArchiveTab(forceRefresh = false) {
   if (!tbody) return;
   tbody.innerHTML = '<tr class="table-placeholder"><td colspan="7">Chargement du journal…</td></tr>';
 
-  const { source, entries, fromCache } = await fetchArchiveEntries(forceRefresh);
+  let { source, entries, fromCache } = await fetchArchiveEntries(forceRefresh);
 
   if (sourceNote) {
     const cacheNote = fromCache ? ' (données en cache — cliquer ACTUALISER pour rafraîchir)' : '';
@@ -125,8 +186,14 @@ async function renderArchiveTab(forceRefresh = false) {
       let actionClass = 'tag-info';
       if (ev.action?.toLowerCase().includes('création')) actionClass = 'tag-pass';
       if (ev.action?.toLowerCase().includes('suppression')) actionClass = 'tag-fail';
+      
       const propsMods = Array.isArray(ev.proprietes_modifiees) ? ev.proprietes_modifiees : [];
-      const summary = propsMods.length ? `Champs: ${propsMods.join(', ')}` : '—';
+      // Filtrer les champs internes et formater
+      const visibleProps = propsMods
+        .filter(k => !INTERNAL_KEYS.includes(k))
+        .map(formatEventKey);
+      
+      const summary = visibleProps.length ? `Champs: ${visibleProps.join(', ')}` : '—';
       return `<tr>
         <td class="mono" style="font-size:11px;">${date.toLocaleDateString('fr-FR')} ${date.toLocaleTimeString('fr-FR')}</td>
         <td><span class="tag ${actionClass}">${ev.action || '—'}</span></td>
@@ -140,10 +207,9 @@ async function renderArchiveTab(forceRefresh = false) {
   } else {
     tbody.innerHTML = entries.map(e => {
       const date = new Date(e.ts);
-      const actionTag = {
-        creation: 'tag-pass', modification: 'tag-info', suppression: 'tag-fail',
-        statut: 'tag-info', balisage: 'tag-warn', action_recommandee: 'tag-warn',
-      }[e.actionType] || 'tag-info';
+      let actionTag = 'tag-info';
+      if (e.actionType === 'creation') actionTag = 'tag-pass';
+      if (e.actionType === 'suppression') actionTag = 'tag-fail';
       const labels = {
         creation: 'Création', modification: 'Modification', suppression: 'Suppression',
         statut: 'Changement de statut', balisage: 'État de balisage', action_recommandee: 'Action recommandée',
@@ -159,27 +225,189 @@ async function renderArchiveTab(forceRefresh = false) {
       </tr>`;
     }).join('');
   }
+  updateArchivePaginationUI();
 }
 
 /** Affiche les détails d'un événement d'audit */
 async function showEventDetails(id) {
   try {
     const res = await apiFetch(`/evenements/${id}/detail`);
-    const ev = res.data;
-    const diffList = (ev.changements || []).map(c => `
-      <div style="margin-bottom:8px; border-bottom:1px solid var(--border-light); padding-bottom:8px;">
-        <div style="font-weight:bold; color:var(--text-main);">${c.propriete}</div>
-        <div style="display:flex; justify-content:space-between; margin-top:4px; font-size:12px;">
-          <div style="flex:1; color:var(--red); text-decoration:line-through; word-break:break-all; padding-right:8px;">
-            ${c.ancienne_valeur !== undefined ? JSON.stringify(c.ancienne_valeur) : 'N/A'}
-          </div>
-          <div style="flex:1; color:var(--green); word-break:break-all;">
-            ${c.nouvelle_valeur !== undefined ? JSON.stringify(c.nouvelle_valeur) : 'N/A'}
+    const ev = res.data || res; // Supporte si le backend renvoie l'objet directement
+    
+    const typeActionRaw = (ev.type_action || ev.action || 'Action système').toUpperCase();
+    let actionLabel = typeActionRaw;
+    let actionCategory = 'UPDATE';
+    if (typeActionRaw.includes('INSERT') || typeActionRaw.includes('CRÉATION') || typeActionRaw.includes('CREATE')) {
+      actionLabel = 'Création';
+      actionCategory = 'CREATE';
+    } else if (typeActionRaw.includes('DELETE') || typeActionRaw.includes('SUPPRESSION')) {
+      actionLabel = 'Suppression';
+      actionCategory = 'DELETE';
+    } else if (typeActionRaw.includes('UPDATE') || typeActionRaw.includes('MODIFICATION')) {
+      actionLabel = 'Modification';
+      actionCategory = 'UPDATE';
+    }
+
+    const anciennes = ev.anciennes_valeurs || {};
+    const nouvelles = ev.nouvelles_valeurs || {};
+    const allKeys = new Set([...Object.keys(anciennes), ...Object.keys(nouvelles)]);
+    
+    let changements = [];
+
+    // Priorité absolue : générer les diffs à partir des objets structurés (anciennes/nouvelles valeurs)
+    if (allKeys.size > 0) {
+      changements = Array.from(allKeys)
+        .map(key => ({
+          propriete: key,
+          ancienne_valeur: anciennes[key],
+          nouvelle_valeur: nouvelles[key]
+        }));
+    } else {
+      // Repli si le backend a envoyé une structure différente (ex: ev.changements)
+      let rawChangements = ev.changements || ev.diff || res.changements || [];
+      changements = rawChangements.map(c => {
+        if (typeof c === 'string') return { propriete: c };
+        return c;
+      });
+    }
+
+    // Filtrer les clés internes et les changements sans valeur exploitable
+    changements = changements.filter(c => {
+      const prop = c.propriete || c.field || c.nom;
+      if (!prop || INTERNAL_KEYS.includes(prop)) return false;
+
+      const o = c.ancienne_valeur !== undefined ? c.ancienne_valeur : c.old;
+      const n = c.nouvelle_valeur !== undefined ? c.nouvelle_valeur : c.new;
+      
+      // En création ou suppression on a besoin d'au moins une des deux valeurs
+      if (o === undefined && n === undefined) return false;
+      return true;
+    });
+
+    // Filtrer les changements selon le type d'action pour ne garder que ce qui a varié
+    if (actionCategory === 'UPDATE') {
+      changements = changements.filter(c => {
+        const o = c.ancienne_valeur !== undefined ? c.ancienne_valeur : c.old;
+        const n = c.nouvelle_valeur !== undefined ? c.nouvelle_valeur : c.new;
+        return JSON.stringify(o) !== JSON.stringify(n); 
+      });
+    }
+
+    const formatValue = (v) => {
+      if (v === null || v === undefined || v === '') return '—';
+      if (typeof v === 'boolean') return v ? 'Oui' : 'Non';
+      if (typeof v === 'object') {
+        if (v.type === 'Point' && Array.isArray(v.coordinates)) {
+          return `Lat ${v.coordinates[1].toFixed(5)}, Lng ${v.coordinates[0].toFixed(5)}`;
+        }
+        if (Array.isArray(v)) return v.join(', ');
+        return JSON.stringify(v);
+      }
+      if (typeof v === 'string' && v.match(/^\d{4}-\d{2}-\d{2}T/)) {
+        try { return new Date(v).toLocaleString('fr-FR'); } catch(e) {}
+      }
+      return String(v);
+    };
+
+    let diffListHtml = '';
+    
+    if (changements.length > 0) {
+      diffListHtml = changements.map(c => {
+        const propKey = c.propriete || c.field || c.nom;
+        const prop = formatEventKey(propKey || 'Propriété');
+        let oldV = c.ancienne_valeur !== undefined ? c.ancienne_valeur : (c.old !== undefined ? c.old : null);
+        let newV = c.nouvelle_valeur !== undefined ? c.nouvelle_valeur : (c.new !== undefined ? c.new : null);
+        
+        // Convertir altitude_max et hauteur de ft en m
+        if (propKey === 'altitude_max' || propKey === 'hauteur' || propKey === 'altitude') {
+          if (typeof oldV === 'number') oldV = Math.round((oldV / 3.28084) * 100) / 100;
+          if (typeof newV === 'number') newV = Math.round((newV / 3.28084) * 100) / 100;
+        }
+
+        let valHtml = '';
+        if (actionCategory === 'CREATE') {
+          valHtml = `<div style="color:var(--green); word-break:break-word;">${formatValue(newV)}</div>`;
+        } else if (actionCategory === 'DELETE') {
+          valHtml = `<div style="color:var(--red); text-decoration:line-through; word-break:break-word;">${formatValue(oldV)}</div>`;
+        } else {
+          valHtml = `
+            <div style="flex:1; color:var(--red); text-decoration:line-through; word-break:break-word; padding-right:8px;">${formatValue(oldV)}</div>
+            <div style="flex:1; color:var(--green); word-break:break-word;">${formatValue(newV)}</div>
+          `;
+        }
+        
+        return `
+        <div style="margin-bottom:8px; border-bottom:1px solid var(--border-light); padding-bottom:8px;">
+          <div style="font-weight:bold; color:var(--text-main); margin-bottom:4px;">${prop}</div>
+          <div style="display:flex; justify-content:space-between; font-size:13px;">
+            ${valHtml}
           </div>
         </div>
-      </div>
-    `).join('');
-    showModal("Détails de l'événement", `<div style="max-height: 400px; overflow-y:auto; overflow-x:hidden;">${diffList || 'Aucun détail technique'}</div>`);
+        `;
+      }).join('');
+    }
+
+    const nomElement = (ev.document_id && ev.document_id.nom) ? ev.document_id.nom : (ev.nom_semantique || ev.collection_impactee || ev.collection || 'Élément inconnu');
+
+    // Afficher les détails textuels renvoyés par le serveur s'ils existent (notes ou log système)
+    let detailsLogsHtml = '';
+    if (ev.details && Array.isArray(ev.details) && ev.details.length > 0) {
+      // Filtrer pour éviter de réafficher des trucs redondants si on a déjà un diffListeHtml
+      const logsToKeep = diffListHtml ? ev.details.filter(d => !d.startsWith('[~] Modification')) : ev.details;
+      if (logsToKeep.length > 0) {
+        detailsLogsHtml = `
+          <div style="margin-top:15px; padding:10px; background:var(--bg-subtle); border-radius:6px; font-size:12px; color:var(--text-secondary); border:1px solid var(--border-light);">
+            <strong style="display:block; margin-bottom:5px; color:var(--text-main);">Notes du système :</strong>
+            <ul style="margin:0; padding-left:20px; line-height:1.4;">
+              ${logsToKeep.map(d => `<li>${d}</li>`).join('')}
+            </ul>
+          </div>
+        `;
+      }
+    }
+
+    let bodyHtml = '';
+    if (diffListHtml) {
+      bodyHtml = `
+        <div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border-light);">
+          <div style="margin-bottom: 4px;"><strong>Type d'action :</strong> <span class="tag tag-info">${actionLabel}</span></div>
+          <div><strong>Élément concerné :</strong> ${nomElement}</div>
+        </div>
+        ${diffListHtml}
+        ${detailsLogsHtml}
+      `;
+    } else {
+      let iconColor = 'var(--primary)';
+      let msgTitle = "Aucun détail technique disponible.";
+      let msgDesc = "Cet événement a été enregistré sans données détaillées.";
+      
+      if (actionCategory === 'CREATE') {
+        iconColor = 'var(--green)';
+        msgTitle = "Création effectuée";
+        msgDesc = "L'élément a été créé avec succès.";
+      } else if (actionCategory === 'DELETE') {
+        iconColor = 'var(--red)';
+        msgTitle = "Suppression effectuée";
+        msgDesc = "L'élément a été supprimé.";
+      } else {
+        msgTitle = "Aucune modification de valeur détectée.";
+        msgDesc = "Il est possible que l'élément ait été sauvegardé sans aucun changement par l'utilisateur.";
+      }
+      
+      bodyHtml = `
+      <div style="padding: 15px; color:var(--text-main); font-size: 14px; text-align:center; background: var(--bg-soft); border-radius: 8px; margin-top: 10px;">
+        <i class="fa fa-info-circle" style="font-size:24px; color:${iconColor}; margin-bottom: 10px;"></i>
+        <div style="margin-bottom: 8px; font-weight:bold;">${msgTitle}</div>
+        <div style="color:var(--text-secondary); font-size: 13px;">${msgDesc}</div>
+        <div style="margin-top: 15px; text-align:left; border-top: 1px solid var(--border-light); padding-top: 10px;">
+          <div style="margin-bottom: 4px;"><strong>Type d'action :</strong> <span class="tag tag-info">${actionLabel}</span></div>
+          <div><strong>Élément concerné :</strong> ${nomElement}</div>
+        </div>
+        ${detailsLogsHtml}
+      </div>`;
+    }
+
+    showModal("Détails de l'événement", `<div style="max-height: 400px; overflow-y:auto; overflow-x:hidden;">${bodyHtml}</div>`);
   } catch (e) {
     showToast('Erreur lors du chargement des détails', 'error');
   }

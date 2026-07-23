@@ -168,6 +168,9 @@ async function submitObstacle() {
   if (!name || isNaN(altM) || isNaN(lat) || isNaN(lon)) {
     showToast('Veuillez remplir les champs obligatoires (désignation, altitude, coordonnées)', 'warn'); return;
   }
+  if (temporal !== 'permanent' && !expiry) {
+    showToast('La date de fin de validité est obligatoire pour un obstacle temporaire/en construction', 'warn'); return;
+  }
   if (!App.aerodromeMongoId) {
     showToast('Aérodrome non chargé, impossible de soumettre', 'error'); return;
   }
@@ -240,7 +243,9 @@ function buildObstaclePayload({ name, proprietaire, type, lat, lon, altM, height
     // backend, avec un sous-type conservé côté client pour le voyant dédié.
     permanence: temporal === 'permanent' ? 'Permanent' : 'Temporaire',
     type_temporel: temporal, // 'permanent' | 'temporary' | 'construction'
-    ...(temporal !== 'permanent' && expiry ? { date_echeance: expiry } : {}),
+    date_echeance: (temporal !== 'permanent' && expiry) ? expiry : null,
+    date_expiration: (temporal !== 'permanent' && expiry) ? expiry : null,
+    date_fin_validite: (temporal !== 'permanent' && expiry) ? expiry : null,
 
     // ── Attributs étendus — conformes au Tableau A6-2 (Annexe 15 OACI) ──
     // Envoyés en plus du schéma de base ; ignorés sans risque par un
@@ -414,18 +419,18 @@ async function loadObstaclesList() {
   const mongoId = App.aerodromeMongoId;
   if (!mongoId) return;
   try {
-    const res = await apiFetch(`/obstacles?aerodrome_id=${mongoId}&page=${App.obstaclesPage}&limit=10&submitter=true`);
+    const res = await apiFetch(`/obstacles?aerodrome_id=${mongoId}&page=${App.obstaclesPage}&limit=25&submitter=true`);
     const raw = res.data || (Array.isArray(res) ? res : []);
     App.allObstacles = raw.map(normalizeObstacleFromAPI);
     App.obstacles = [...App.allObstacles];
     
     // Déduction robuste du nombre total de pages
-    const isFullPage = raw.length >= 10;
+    const isFullPage = raw.length >= 25;
     if (res.pagination && res.pagination.totalPages) App.obstaclesTotalPages = res.pagination.totalPages;
     else if (res.totalPages) App.obstaclesTotalPages = res.totalPages;
     else if (res.total_pages) App.obstaclesTotalPages = res.total_pages;
-    else if (res.total && res.total > 10) App.obstaclesTotalPages = Math.ceil(res.total / 10);
-    else if (isFullPage) App.obstaclesTotalPages = App.obstaclesPage + 1; // Toujours supposer une suite si la page est pleine
+    else if (typeof res.total === 'number') App.obstaclesTotalPages = Math.ceil(res.total / 25) || 1;
+    else if (isFullPage) App.obstaclesTotalPages = App.obstaclesPage + 1; // Fallback
     else App.obstaclesTotalPages = App.obstaclesPage;
     
     updatePaginationUI();
@@ -947,7 +952,17 @@ function showObstacleConformityDetail(id) {
 async function setObstacleStatus(id, newStatus) {
   const backendStatus = { draft: 'Draft', pending: 'Pending', validated: 'Validated' }[newStatus] || newStatus;
   try {
-    await apiFetch(`/obstacles/${id}`, 'PATCH', { statut_validation: backendStatus });
+    let patchPayload = { statut_validation: backendStatus };
+    try {
+      const getRes = await apiFetch(`/obstacles/${id}`);
+      const obsData = getRes.data || getRes.obstacle || getRes || {};
+      if (obsData.frangibilite == null) patchPayload.frangibilite = false;
+      if (obsData.mobilite == null) patchPayload.mobilite = 'Fixe';
+      if (obsData.balisage == null) patchPayload.balisage = { jour: [], nuit: [] };
+      if (obsData.hauteur == null) patchPayload.hauteur = 0;
+      if (obsData.zone_de_couverture == null) patchPayload.zone_de_couverture = '3';
+    } catch(e) {}
+    await apiFetch(`/obstacles/${id}`, 'PATCH', patchPayload);
   } catch (e) {
     console.warn('[setObstacleStatus]', e);
   }
@@ -1012,7 +1027,18 @@ function renderPendingList(list) {
    encore ces champs, pour ne pas perdre la saisie de l'utilisateur.
 ══════════════════════════════════════════════════════════ */
 async function updateObstacleBalisage(id, value) {
-  try { await apiFetch(`/obstacles/${id}`, 'PATCH', { balisage_etat: value }); }
+  try {
+    let patchPayload = { balisage_etat: value };
+    try {
+      const getRes = await apiFetch(`/obstacles/${id}`);
+      const obsData = getRes.data || getRes.obstacle || getRes || {};
+      if (obsData.frangibilite === undefined) patchPayload.frangibilite = false;
+      if (obsData.mobilite === undefined) patchPayload.mobilite = 'Fixe';
+      if (obsData.balisage === undefined) patchPayload.balisage = { jour: [], nuit: [] };
+      if (obsData.hauteur === undefined) patchPayload.hauteur = 0;
+    } catch(e) {}
+    await apiFetch(`/obstacles/${id}`, 'PATCH', patchPayload);
+  }
   catch (e) { console.warn('[updateObstacleBalisage] backend indisponible pour ce champ', e.message); }
   const obs = App.allObstacles.find(o => o._id === id);
   if (obs) obs.balisageEtat = value || null;
@@ -1024,7 +1050,18 @@ async function updateObstacleBalisage(id, value) {
 }
 
 async function updateObstacleAction(id, value) {
-  try { await apiFetch(`/obstacles/${id}`, 'PATCH', { action_recommandee: value }); }
+  try {
+    let patchPayload = { action_recommandee: value };
+    try {
+      const getRes = await apiFetch(`/obstacles/${id}`);
+      const obsData = getRes.data || getRes.obstacle || getRes || {};
+      if (obsData.frangibilite === undefined) patchPayload.frangibilite = false;
+      if (obsData.mobilite === undefined) patchPayload.mobilite = 'Fixe';
+      if (obsData.balisage === undefined) patchPayload.balisage = { jour: [], nuit: [] };
+      if (obsData.hauteur === undefined) patchPayload.hauteur = 0;
+    } catch(e) {}
+    await apiFetch(`/obstacles/${id}`, 'PATCH', patchPayload);
+  }
   catch (e) { console.warn('[updateObstacleAction] backend indisponible pour ce champ', e.message); }
   const obs = App.allObstacles.find(o => o._id === id);
   if (obs) obs.actionRecommandee = value || null;
@@ -1042,8 +1079,28 @@ async function updateObstacleAction(id, value) {
 ══════════════════════════════════════════════════════════ */
 async function updateObstacle(id, payload) {
   try {
-    const res = await apiFetch(`/obstacles/${id}`, 'PATCH', payload);
-    const apiObs = normalizeObstacleFromAPI(res.data || { ...payload, _id: id });
+    // Pour éviter les erreurs de validation (Mongoose) sur les anciens obstacles qui n'ont pas
+    // les nouveaux attributs requis, on récupère l'obstacle actuel depuis la base.
+    let existingObs = {};
+    try {
+      const getRes = await apiFetch(`/obstacles/${id}`);
+      existingObs = getRes.data || getRes.obstacle || getRes || {};
+    } catch (err) {
+      console.warn('[updateObstacle] Impossible de pré-charger l\'obstacle existant', err.message);
+    }
+
+    // On complète le payload avec des valeurs par défaut pour les champs requis manquants
+    // (ou nuls) dans l'ancien document, pour éviter les CastError/ValidationError de Mongoose.
+    const patchPayload = { ...payload };
+    if (existingObs.frangibilite == null && patchPayload.frangibilite == null) patchPayload.frangibilite = false;
+    if (existingObs.mobilite == null && patchPayload.mobilite == null) patchPayload.mobilite = 'Fixe';
+    if (existingObs.balisage == null && patchPayload.balisage == null) patchPayload.balisage = { jour: [], nuit: [] };
+    if (existingObs.hauteur == null && patchPayload.hauteur == null) patchPayload.hauteur = 0;
+    // Forcer une valeur par défaut pour la zone si manquante et nulle part ailleurs
+    if (existingObs.zone_de_couverture == null && patchPayload.zone_de_couverture == null) patchPayload.zone_de_couverture = '3';
+
+    const res = await apiFetch(`/obstacles/${id}`, 'PATCH', patchPayload);
+    const apiObs = normalizeObstacleFromAPI(res.data || { ...patchPayload, _id: id });
 
     if (payload.date_echeance && !apiObs.expiry) {
       apiObs.expiry = payload.date_echeance;

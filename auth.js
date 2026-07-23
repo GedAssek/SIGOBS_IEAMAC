@@ -176,13 +176,43 @@ function showApp() {
   const btnArchive = document.getElementById('tab-btn-archive');
   const btnToggleAllObs = document.getElementById('btn-toggle-all-obs');
   
+  const aeroArray = App.user?.aerodromes || App.user?.aerodromes_autorises || [];
+  const hasMultipleAerodromes = aeroArray.length > 0;
+
   // RBAC Tab access logic based on API documentation
   if (btnRunways) btnRunways.style.display = (isAdmin || isEvaluator) ? 'block' : 'none';
-  if (btnAerodromes) btnAerodromes.style.display = (isAdmin || isEvaluator) ? 'block' : 'none';
+  if (btnAerodromes) btnAerodromes.style.display = (isAdmin || isEvaluator || hasMultipleAerodromes) ? 'block' : 'none';
   if (btnArchive) btnArchive.style.display = (isAdmin || isEvaluator) ? 'block' : 'none';
   if (btnUsers) btnUsers.style.display = isAdmin ? 'block' : 'none';
+
+  // Cacher le panneau de création d'aérodrome pour les non-admins et corriger le layout CSS Grid
+  const aeroAddPanel = document.querySelector('#tab-aerodromes .panel-left');
+  const aeroAppLayout = document.querySelector('#tab-aerodromes .app-layout');
+  if (aeroAddPanel && aeroAppLayout) {
+    if (isAdmin || isEvaluator) {
+      aeroAddPanel.style.display = 'block';
+      aeroAppLayout.style.gridTemplateColumns = '320px 1fr';
+    } else {
+      aeroAddPanel.style.display = 'none';
+      aeroAppLayout.style.gridTemplateColumns = '1fr';
+    }
+  }
   
   if (btnToggleAllObs) btnToggleAllObs.style.display = (isAdmin || isEvaluator) ? 'flex' : 'none';
+
+  // Ajuster le menu déroulant de la corbeille pour les non-admins
+  const corbeilleSelect = document.getElementById('corbeille-type-select');
+  if (corbeilleSelect) {
+    Array.from(corbeilleSelect.options).forEach(opt => {
+      if (opt.value !== 'obstacles') {
+        opt.style.display = (isAdmin || isEvaluator) ? 'block' : 'none';
+        opt.disabled = !(isAdmin || isEvaluator);
+      }
+    });
+    if (!isAdmin && !isEvaluator && corbeilleSelect.value !== 'obstacles') {
+      corbeilleSelect.value = 'obstacles';
+    }
+  }
 
   setApiStatus('connected');
 
@@ -190,7 +220,8 @@ function showApp() {
   setTimeout(() => {
     geoMapInit();
     bindCoordInputListeners();
-    loadStudyAerodrome().then(() => loadAllAerodromes());
+    // On charge d'abord TOUTE la liste des aérodromes autorisés pour savoir sur quoi atterrir
+    loadAllAerodromes().then(() => loadStudyAerodrome());
   }, 300);
 }
 

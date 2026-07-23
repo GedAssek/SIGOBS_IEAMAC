@@ -147,10 +147,21 @@ function renderRunwaysManagementList() {
 
   if (!App.runways.length) {
     container.innerHTML = '<div class="empty-msg">Aucune piste disponible pour cet aérodrome</div>';
+    updateRunwaysPaginationUI();
     return;
   }
 
-  container.innerHTML = App.runways.map(rwy => `
+  App.runwaysCurrentPage = App.runwaysCurrentPage || 1;
+  App.runwaysTotalPages = Math.ceil(App.runways.length / 25) || 1;
+  
+  if (App.runwaysCurrentPage > App.runwaysTotalPages) {
+    App.runwaysCurrentPage = App.runwaysTotalPages;
+  }
+  
+  const start = (App.runwaysCurrentPage - 1) * 25;
+  const paginatedRunways = App.runways.slice(start, start + 25);
+
+  container.innerHTML = paginatedRunways.map(rwy => `
     <div class="runway-mgmt-item">
       <div class="runway-mgmt-header">
         <span class="runway-mgmt-desig">RWY ${rwy.designation || '—'}</span>
@@ -165,6 +176,36 @@ function renderRunwaysManagementList() {
       </div>
     </div>
   `).join('');
+  
+  updateRunwaysPaginationUI();
+}
+
+function updateRunwaysPaginationUI() {
+  const paginationDiv = document.getElementById('runways-pagination');
+  const info = document.getElementById('runways-pagination-info');
+  if (!paginationDiv) return;
+  
+  paginationDiv.style.display = 'flex';
+  if (info) info.textContent = `Page ${App.runwaysCurrentPage} sur ${App.runwaysTotalPages}`;
+  
+  const btnPrev = paginationDiv.querySelector('button:first-child');
+  const btnNext = paginationDiv.querySelector('button:last-child');
+  if (btnPrev) btnPrev.disabled = App.runwaysCurrentPage <= 1;
+  if (btnNext) btnNext.disabled = App.runwaysCurrentPage >= App.runwaysTotalPages;
+}
+
+function nextRunwaysPage() {
+  if (App.runwaysCurrentPage < App.runwaysTotalPages) {
+    App.runwaysCurrentPage++;
+    renderRunwaysManagementList();
+  }
+}
+
+function prevRunwaysPage() {
+  if (App.runwaysCurrentPage > 1) {
+    App.runwaysCurrentPage--;
+    renderRunwaysManagementList();
+  }
 }
 
 /* ══════════════════════════════════════════════════════════
