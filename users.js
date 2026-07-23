@@ -220,9 +220,12 @@ function openEditUser(id) {
   _editingUserId = id;
 
   document.getElementById('user-email').value = user.email || '';
+  document.getElementById('user-email').disabled = true; // Non modifiable via cette route
+  
   const roleRef = user.role || user.role_id;
   const roleId = typeof roleRef === 'object' && roleRef !== null ? (roleRef._id || roleRef.id) : roleRef;
   document.getElementById('user-role-select').value = roleId || '';
+  document.getElementById('user-role-select').disabled = true; // Non modifiable via cette route
   
   // Set checkboxes
   const checkboxes = document.querySelectorAll('#user-aero-checkboxes input[type="checkbox"]');
@@ -289,23 +292,19 @@ function reviewUserCreation() {
 
 /** Soumet la création ou la modification de l'utilisateur au serveur */
 async function confirmSubmitUser(email, password, roleId, aerodromeIds) {
-  const payload = {
-    email,
-    role_id: roleId,
-  };
-  
-  if (!_editingUserId) {
-    payload.password = password;
-  }
-  
-  // Envoyer le tableau des aérodromes associés
-  payload.aerodromes = aerodromeIds; // Envoie tableau vide si aucun coché
-
   try {
     if (_editingUserId) {
-      await apiFetch(`/utilisateurs/${_editingUserId}`, 'PATCH', payload);
-      showToast(`Utilisateur « ${email} » modifié avec succès`, 'success');
+      // Pour l'édition, on ne peut modifier que les aérodromes selon la documentation
+      const payload = { aerodromes: aerodromeIds };
+      await apiFetch(`/utilisateurs/${_editingUserId}/aerodromes`, 'PATCH', payload);
+      showToast(`Aérodromes de l'utilisateur « ${email} » modifiés avec succès`, 'success');
     } else {
+      const payload = {
+        email,
+        password,
+        role_id: roleId,
+        aerodromes: aerodromeIds
+      };
       await apiFetch('/utilisateurs', 'POST', payload);
       showToast(`Utilisateur « ${email} » créé avec succès`, 'success');
     }
@@ -322,10 +321,16 @@ function clearUserForm() {
   _editingUserId = null;
   ['user-email', 'user-password', 'user-aero-search'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.value = '';
+    if (el) {
+      el.value = '';
+      el.disabled = false;
+    }
   });
   const sel = document.getElementById('user-role-select');
-  if (sel) sel.value = '';
+  if (sel) {
+    sel.value = '';
+    sel.disabled = false;
+  }
   
   // Décocher les aérodromes et réinitialiser le filtre
   const checkboxes = document.querySelectorAll('#user-aero-checkboxes input[type="checkbox"]');
