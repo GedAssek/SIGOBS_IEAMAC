@@ -39,13 +39,27 @@ async function loadStudyAerodrome() {
     : App.user?.aerodrome_id;
 
   const aeroArray = App.aerodromesList && App.aerodromesList.length > 0 ? App.aerodromesList : (App.user?.aerodromes || App.user?.aerodromes_autorises || []);
-  if (!userAerodromeId && aeroArray.length > 0) {
-    userAerodromeId = typeof aeroArray[0] === 'object' ? aeroArray[0]._id : aeroArray[0];
-  }
 
   const roleRaw = App.user?.role;
   const roleName = typeof roleRaw === 'object' ? roleRaw.nomRole || roleRaw.name : roleRaw;
   const isAdmin = roleName && roleName.toLowerCase().includes('admin');
+
+  // Si c'est un admin et qu'on cherche un aérodrome par défaut
+  if (isAdmin) {
+    const lome = aeroArray.find(a => {
+      if (typeof a !== 'object') return false;
+      const oaci = a.code_oaci || '';
+      const nom = a.nom || a.name || '';
+      return oaci === (typeof STUDY_AERODROME_ICAO !== 'undefined' ? STUDY_AERODROME_ICAO : 'DXXX') || nom.toUpperCase().includes('LOM');
+    });
+    if (lome) {
+      userAerodromeId = typeof lome === 'object' ? lome._id : lome;
+    }
+  }
+
+  if (!userAerodromeId && aeroArray.length > 0) {
+    userAerodromeId = typeof aeroArray[0] === 'object' ? aeroArray[0]._id : aeroArray[0];
+  }
 
   let finalId = null;
 

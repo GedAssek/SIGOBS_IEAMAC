@@ -242,10 +242,7 @@ function buildObstaclePayload({ name, proprietaire, type, lat, lon, altM, height
     // la fin du projet (retour n°15) — traité comme "Temporaire" côté
     // backend, avec un sous-type conservé côté client pour le voyant dédié.
     permanence: temporal === 'permanent' ? 'Permanent' : 'Temporaire',
-    type_temporel: temporal, // 'permanent' | 'temporary' | 'construction'
-    date_echeance: (temporal !== 'permanent' && expiry) ? expiry : null,
-    date_expiration: (temporal !== 'permanent' && expiry) ? expiry : null,
-    date_fin_validite: (temporal !== 'permanent' && expiry) ? expiry : null,
+    date_echeance: temporal === 'permanent' ? null : (expiry || undefined),
 
     // ── Attributs étendus — conformes au Tableau A6-2 (Annexe 15 OACI) ──
     // Envoyés en plus du schéma de base ; ignorés sans risque par un
@@ -263,7 +260,7 @@ function buildObstaclePayload({ name, proprietaire, type, lat, lon, altM, height
     systeme_reference_vertical: getVal('oe-ref-v') || undefined,
     type_geometrie: getVal('oe-geom-type') || 'Point',
     integrite: getVal('oe-integrite') || undefined,
-    date_heure_releve: getVal('oe-datetime') || undefined,
+    date_recensement: getVal('oe-datetime') || undefined,
     unite_mesure: unite_mesure !== undefined ? unite_mesure : (getVal('oe-unite-mesure') || 'm'),
     operations: getVal('oe-operations') || undefined,
     applicabilite: getVal('oe-applicabilite') || undefined,
@@ -630,7 +627,7 @@ function renderObstaclesList(list) {
       : `<span class="surface-tag-none ${penetrates ? 'surface-tag-unknown' : 'surface-tag-ok'}">—</span>`;
     return `<tr>
       <td style="font-weight:600;">${obs.name}</td>
-      <td>${typeToLabel(obs.type)}</td>
+      <td>${typeToIcon(obs.type)} ${typeToLabel(obs.type)}</td>
       <td style="font-size:11px;color:var(--cyan);">${obs.proprietaire || '—'}</td>
       <td class="mono" title="${obs.latitude != null ? ddToDms(obs.latitude, 'lat') : ''}">${obs.latitude != null ? obs.latitude.toFixed(6) : '—'}</td>
       <td class="mono" title="${obs.longitude != null ? ddToDms(obs.longitude, 'lon') : ''}">${obs.longitude != null ? obs.longitude.toFixed(6) : '—'}</td>
@@ -1014,7 +1011,7 @@ function renderPendingList(list) {
   el.innerHTML = list.map(obs =>
     `<div class="expiry-item warning">
       <span class="expiry-name">${obs.name}</span>
-      <span class="expiry-date">${typeToLabel(obs.type)} — En attente validation</span>
+      <span class="expiry-date">${typeToIcon(obs.type)} ${typeToLabel(obs.type)} — En attente validation</span>
     </div>`
   ).join('');
 }
@@ -1099,15 +1096,8 @@ async function updateObstacle(id, payload) {
     // Forcer une valeur par défaut pour la zone si manquante et nulle part ailleurs
     if (existingObs.zone_de_couverture == null && patchPayload.zone_de_couverture == null) patchPayload.zone_de_couverture = '3';
 
-    // Correction cruciale : Lors d'un PATCH de Permanent vers Temporaire, Mongoose ne génère pas 
-    // automatiquement les dates de début par défaut (contrairement au POST). Si elles sont requises, 
-    // la validation échoue. On les injecte donc manuellement.
-    if (patchPayload.permanence === 'Temporaire' || patchPayload.type_temporel !== 'permanent') {
-      const now = new Date().toISOString();
-      if (!existingObs.date_debut_validite && !patchPayload.date_debut_validite) patchPayload.date_debut_validite = now;
-      if (!existingObs.date_debut && !patchPayload.date_debut) patchPayload.date_debut = now;
-      if (!existingObs.date_heure_releve && !patchPayload.date_heure_releve) patchPayload.date_heure_releve = now;
-    }
+    // Le backend valide strictement les données. Plus besoin d'injecter manuellement des dates de début
+    // obsolètes qui causeraient des erreurs Zod "Unrecognized key(s)".
 
     const res = await apiFetch(`/obstacles/${id}`, 'PATCH', patchPayload);
     const apiObs = normalizeObstacleFromAPI(res.data || { ...patchPayload, _id: id });
@@ -1582,6 +1572,11 @@ function updateConformityPanel() {
     mainEl.textContent = 'EN COURS';
     mainEl.style.setProperty('color', '#FFD600', 'important');
     if (subEl) subEl.textContent = `${total} OBSTACLE(S) EN ATTENTE`;
+  }
+
+  const surfListEl = document.getElementById('conf-surfaces-list');
+  if (surfListEl) {
+    surfListEl.innerHTML = '<div class="conf-surface-row empty"><span>—</span></div>';
   }
 }
 

@@ -827,7 +827,7 @@ function renderObstaclesList(list) {
     const verdict = result == null ? '<span class="tag tag-info">HORS ZONE</span>' : breach ? '<span class="tag tag-fail">PÉNÉTRATION</span>' : '<span class="tag tag-pass">CONFORME</span>';
     const statusTag = `<span class="tag tag-${obs.status || 'draft'}">${statusLabel(obs.status)}</span>`;
     const temporal = obs.temporal === 'temporary' ? `<span class="tag tag-warn">TEMP</span>` : `<span class="tag tag-info">PERM</span>`;
-    return `<tr><td style="font-weight:600;">${obs.name}</td><td>${typeToLabel(obs.type)}</td><td class="mono">${obs.latitude != null ? obs.latitude.toFixed(6) : '—'}</td><td class="mono">${obs.longitude != null ? obs.longitude.toFixed(6) : '—'}</td><td class="mono">${obs.altitude ?? '—'}</td><td class="mono">${obs.height ?? '—'}</td><td>${temporal}</td><td>${statusTag}</td><td>${verdict}</td><td>${buildWorkflowActions(obs)}</td></tr>`;
+    return `<tr><td style="font-weight:600;">${obs.name}</td><td>${typeToIcon(obs.type)} ${typeToLabel(obs.type)}</td><td class="mono">${obs.latitude != null ? obs.latitude.toFixed(6) : '—'}</td><td class="mono">${obs.longitude != null ? obs.longitude.toFixed(6) : '—'}</td><td class="mono">${obs.altitude ?? '—'}</td><td class="mono">${obs.height ?? '—'}</td><td>${temporal}</td><td>${statusTag}</td><td>${verdict}</td><td>${buildWorkflowActions(obs)}</td></tr>`;
   }).join('');
   const pending = list.filter(o => o.status === 'pending').length;
   const pendingEl = document.getElementById('pending-count');
@@ -862,7 +862,7 @@ function confirmDelete(id, name) {
 function renderPendingList(list) {
   const el = document.getElementById('pending-list'); if (!el) return;
   if (!list.length) { el.innerHTML = '<span class="empty-msg">Aucun élément en attente</span>'; return; }
-  el.innerHTML = list.map(obs => `<div class="expiry-item warning"><span class="expiry-name">${obs.name}</span><span class="expiry-date">${typeToLabel(obs.type)} — En attente validation</span></div>`).join('');
+  el.innerHTML = list.map(obs => `<div class="expiry-item warning"><span class="expiry-name">${obs.name}</span><span class="expiry-date">${typeToIcon(obs.type)} ${typeToLabel(obs.type)} — En attente validation</span></div>`).join('');
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -1372,7 +1372,7 @@ function updateObstaclesLayer() {
       return {
         type: 'Feature',
         properties: {
-          name: obs.name, type: typeToLabel(obs.type),
+          name: obs.name, type: `${typeToIcon(obs.type)} ${typeToLabel(obs.type)}`,
           altitude: obs.altitude, height: obs.height,
           breach, clearance,
           surface: result ? result.surface : 'hors zone',

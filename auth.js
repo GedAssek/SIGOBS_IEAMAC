@@ -35,6 +35,8 @@ async function handleLogin() {
       // Persistance de session (sessionStorage, pas localStorage pour plus de sécurité)
       sessionStorage.setItem('sigobs_token', App.token);
       sessionStorage.setItem('sigobs_user',  JSON.stringify(App.user));
+      // Nettoyer l'aérodrome sauvegardé pour garantir que le routage par défaut s'applique à chaque nouvelle connexion
+      sessionStorage.removeItem('sigobs_aerodrome_id');
       
       if (userData.mustChangePassword || email === password || password === 'password123') {
         // Première connexion (le mot de passe est l'email ou le mot de passe par défaut)

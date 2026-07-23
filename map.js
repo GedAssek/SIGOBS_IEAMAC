@@ -218,7 +218,7 @@ function updateObstaclesLayer() {
       const radiusM = Math.max(8, Math.min(40, heightM * 0.3));
 
       const properties = {
-        name: obs.name, type: typeToLabel(obs.type),
+        name: obs.name, type: `${typeToIcon(obs.type)} ${typeToLabel(obs.type)}`,
         altitude: obs.altitude, height: obs.height,
         latitude: obs.latitude, longitude: obs.longitude,
         color, breach, heightM, baseH: 0, status: obs.status,

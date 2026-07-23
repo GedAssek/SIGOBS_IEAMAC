@@ -141,7 +141,7 @@ function renderSessionList() {
     return `<div class="info-block" style="padding:8px 10px;">
       <div class="info-row"><span style="font-weight:600;color:var(--text-primary);">${obs.name}</span>
         <span class="tag ${breach ? 'tag-fail' : 'tag-pass'}">${breach ? 'PÉNÉTRATION' : 'CONFORME'}</span></div>
-      <div class="info-row"><span>${typeToLabel(obs.type)}</span><span>${statusLabel(obs.status)}</span></div>
+      <div class="info-row"><span>${typeToIcon(obs.type)} ${typeToLabel(obs.type)}</span><span>${statusLabel(obs.status)}</span></div>
     </div>`;
   }).join('');
 }

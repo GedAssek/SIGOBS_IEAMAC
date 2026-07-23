@@ -30,6 +30,9 @@ async function apiFetch(path, method = 'GET', body = null, auth = true) {
       msg += ' : ' + data.details.map(e => e.message).join(', ');
     } else if (data.error && typeof data.error === 'string') {
       msg += ' : ' + data.error;
+    } else {
+      // Pour forcer l'affichage des détails bruts si Mongoose retourne un format inattendu
+      msg += ' (Détails bruts: ' + JSON.stringify(data) + ')';
     }
     throw new Error(msg);
   }
@@ -214,6 +217,19 @@ function typeToLabel(t) {
   return m[t] || t || '—';
 }
 
+/** Convertit la clé interne → icône/emoji correspondant */
+function typeToIcon(t) {
+  const m = {
+    building: '🏢', tower: '🗼', vegetation: '🌳',
+    crane: '🏗️', antenna: '📡', powerline: '⚡',
+    water_tower: '💧', other: '📌',
+    'Immeuble': '🏢', 'Tour': '🗼', 'Végétation': '🌳',
+    'Grue': '🏗️', 'Antenne': '📡', 'Ligne électrique': '⚡',
+    "Château d'eau": '💧', 'Autre': '📌',
+  };
+  return m[t] || '📍';
+}
+
 /** Convertit la clé statut interne → label d'affichage */
 function statusLabel(s) {
   const m = { draft: 'BROUILLON', pending: 'EN ATTENTE', validated: 'VALIDÉ' };
@@ -284,6 +300,7 @@ function switchTab(btn, tab) {
   document.getElementById(`tab-${tab}`).classList.add('active');
   if (tab === 'obstacles') renderObstaclesList(App.allObstacles);
   if (tab === 'analyse' && GeoMap.map) setTimeout(() => GeoMap.map.resize(), 100);
+  if (typeof updateConformityPanel === 'function') updateConformityPanel();
   if (tab === 'users') {
     if (typeof loadUsers === 'function') loadUsers();
     if (typeof populateRoleSelect === 'function') populateRoleSelect();
