@@ -40,19 +40,21 @@ async function loadCorbeille() {
     const isAdmin = typeof getIsAdmin === 'function' ? getIsAdmin() : false;
     const isEvaluator = typeof getIsEvaluator === 'function' ? getIsEvaluator() : false;
     
-    if (!isAdmin && !isEvaluator) {
-      if (type === 'obstacles' || type === 'pistes') {
+    if (!isAdmin) {
+      if (type === 'obstacles' || type === 'pistes' || type === 'aerodromes') {
         const allowedIds = (App.aerodromesList || []).map(a => a._id);
         if (allowedIds.length > 0) {
           data = data.filter(item => {
-            const aeroId = typeof item.aerodrome_id === 'object' ? item.aerodrome_id?._id : item.aerodrome_id;
+            const aeroId = type === 'aerodromes' 
+              ? item._id 
+              : (typeof item.aerodrome_id === 'object' ? item.aerodrome_id?._id : item.aerodrome_id);
             return allowedIds.includes(aeroId);
           });
         } else {
           data = [];
         }
       } else {
-        // Un non-admin n'a pas accès aux aérodromes/utilisateurs supprimés
+        // Seul l'admin a accès aux utilisateurs supprimés (ou autres données système)
         data = [];
       }
     }

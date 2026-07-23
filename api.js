@@ -28,6 +28,8 @@ async function apiFetch(path, method = 'GET', body = null, auth = true) {
       }
     } else if (data.details && Array.isArray(data.details)) {
       msg += ' : ' + data.details.map(e => e.message).join(', ');
+    } else if (data.error && typeof data.error === 'string') {
+      msg += ' : ' + data.error;
     }
     throw new Error(msg);
   }

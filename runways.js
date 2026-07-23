@@ -140,10 +140,23 @@ function renderRunwaysManagementList() {
   if (!container) return;
 
   const isAdmin = typeof getIsAdmin === 'function' ? getIsAdmin() : false;
+  const isEvaluator = typeof getIsEvaluator === 'function' ? getIsEvaluator() : false;
 
-  // Masquer le formulaire d'ajout de piste si non admin
+  // Masquer le formulaire d'ajout de piste si non admin/evaluator, et ajuster la grille
   const addPanel = document.querySelector('#tab-runways .panel-left');
-  if (addPanel) addPanel.style.display = isAdmin ? 'flex' : 'none';
+  const appLayout = document.querySelector('#tab-runways .app-layout');
+  
+  if (addPanel && appLayout) {
+    if (isAdmin || isEvaluator) {
+      addPanel.style.display = 'flex';
+      appLayout.style.gridTemplateColumns = '320px 1fr';
+    } else {
+      addPanel.style.display = 'none';
+      appLayout.style.gridTemplateColumns = '1fr';
+    }
+  } else if (addPanel) {
+    addPanel.style.display = (isAdmin || isEvaluator) ? 'flex' : 'none';
+  }
 
   if (!App.runways.length) {
     container.innerHTML = '<div class="empty-msg">Aucune piste disponible pour cet aérodrome</div>';

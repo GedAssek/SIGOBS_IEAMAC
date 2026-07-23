@@ -1099,6 +1099,16 @@ async function updateObstacle(id, payload) {
     // Forcer une valeur par défaut pour la zone si manquante et nulle part ailleurs
     if (existingObs.zone_de_couverture == null && patchPayload.zone_de_couverture == null) patchPayload.zone_de_couverture = '3';
 
+    // Correction cruciale : Lors d'un PATCH de Permanent vers Temporaire, Mongoose ne génère pas 
+    // automatiquement les dates de début par défaut (contrairement au POST). Si elles sont requises, 
+    // la validation échoue. On les injecte donc manuellement.
+    if (patchPayload.permanence === 'Temporaire' || patchPayload.type_temporel !== 'permanent') {
+      const now = new Date().toISOString();
+      if (!existingObs.date_debut_validite && !patchPayload.date_debut_validite) patchPayload.date_debut_validite = now;
+      if (!existingObs.date_debut && !patchPayload.date_debut) patchPayload.date_debut = now;
+      if (!existingObs.date_heure_releve && !patchPayload.date_heure_releve) patchPayload.date_heure_releve = now;
+    }
+
     const res = await apiFetch(`/obstacles/${id}`, 'PATCH', patchPayload);
     const apiObs = normalizeObstacleFromAPI(res.data || { ...patchPayload, _id: id });
 

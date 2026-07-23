@@ -72,64 +72,12 @@ function showLoginError(msg) {
    LOGOUT — Nettoyage complet de la session
 ══════════════════════════════════════════════════════════ */
 function handleLogout() {
-  // Réinitialiser l'état global
-  App.token             = null;
-  App.user              = null;
-  App.aerodrome         = null;
-  App.aerodromeMongoId  = null;
-  App.aerodromesList    = [];
-  App.currentAerodromeId = null;
-  App.runways           = [];
-  App.activeRunway      = null;
-  App.obstacles         = [];
-  App.allObstacles      = [];
-  App.showAllObstacles  = false;   // ⇦ réinitialiser le toggle admin
-
-  // Nettoyer le stockage session
+  // Nettoyer le stockage de session
   sessionStorage.clear();
 
-  // ── Réinitialiser l'UI ──────────────────────────────────
-  // 1. Masquer les onglets admin (Pistes / Aérodromes / Utilisateurs)
-  const btnRunways = document.getElementById('tab-btn-runways');
-  const btnAerodromes = document.getElementById('tab-btn-aerodromes');
-  const btnUsers   = document.getElementById('tab-btn-users');
-  if (btnRunways) btnRunways.style.display = 'none';
-  if (btnAerodromes) btnAerodromes.style.display = 'none';
-  if (btnUsers)   btnUsers.style.display   = 'none';
-
-  // Supprimer le sélecteur d'aérodrome de la topbar s'il existe
-  const switcher = document.getElementById('aerodrome-switcher-select');
-  if (switcher) switcher.remove();
-
-  // 2. Masquer le bouton "Tous les obstacles"
-  const btnToggle = document.getElementById('btn-toggle-all-obs');
-  if (btnToggle) btnToggle.style.display = 'none';
-
-  // 3. Revenir sur l'onglet Analyse OLS
-  const allTabs    = document.querySelectorAll('.tab-content');
-  const allTabBtns = document.querySelectorAll('.tab-btn');
-  allTabs.forEach(t    => t.classList.remove('active'));
-  allTabBtns.forEach(b => b.classList.remove('active'));
-  const analyseTab    = document.getElementById('tab-analyse');
-  const analyseBtn    = document.getElementById('tab-btn-analyse');
-  if (analyseTab) analyseTab.classList.add('active');
-  if (analyseBtn) analyseBtn.classList.add('active');
-
-  // 4. Fermer le panneau de légende surfaces s'il est ouvert
-  const legendPanel = document.getElementById('surfaces-legend-panel');
-  if (legendPanel) legendPanel.classList.remove('open');
-
-  // Retourner à l'écran de connexion
-  document.getElementById('screen-app').classList.remove('active');
-  document.getElementById('screen-login').classList.add('active');
-  document.getElementById('login-password').value = '';
-
-  // Détruire la carte MapLibre
-  if (GeoMap.map) {
-    GeoMap.map.remove();
-    GeoMap.map         = null;
-    GeoMap.initialized = false;
-  }
+  // Recharger la page pour garantir une mémoire et un DOM 100% vierges
+  // Cela élimine complètement l'effet de "données fantômes" au prochain login
+  window.location.reload();
 }
 
 /* ══════════════════════════════════════════════════════════

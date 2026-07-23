@@ -13,6 +13,7 @@
 
 /* ── Cache des rôles (évite des appels répétés) ──────────── */
 let _cachedRoles = [];
+let _editingUserId = null;
 
 /* ══════════════════════════════════════════════════════════
    RÔLES — GET /roles
@@ -127,7 +128,8 @@ function renderUsersList() {
       <td>${aeroLabel}</td>
       <td>
         <div class="action-group">
-          <button class="action-btn delete" onclick="confirmDeleteUser('${u._id}','${emailSafe}')">✕</button>
+          <button class="action-btn edit" onclick="openEditUser('${u._id || u.id}')" title="Modifier">✎</button>
+          <button class="action-btn delete" onclick="confirmDeleteUser('${u._id || u.id}','${emailSafe}')" title="Supprimer">✕</button>
         </div>
       </td>
     </tr>`;
@@ -209,12 +211,41 @@ function filterUserAerodromes() {
   });
 }
 
+/** 
+ * Ouvre le formulaire d'édition pour un utilisateur existant
+ */
+function openEditUser(id) {
+  const user = App.usersList.find(u => u._id === id || u.id === id);
+  if (!user) return;
+  _editingUserId = id;
+
+  document.getElementById('user-email').value = user.email || '';
+  const roleRef = user.role || user.role_id;
+  const roleId = typeof roleRef === 'object' && roleRef !== null ? (roleRef._id || roleRef.id) : roleRef;
+  document.getElementById('user-role-select').value = roleId || '';
+  
+  // Set checkboxes
+  const checkboxes = document.querySelectorAll('#user-aero-checkboxes input[type="checkbox"]');
+  checkboxes.forEach(cb => cb.checked = false);
+  const aeroArray = Array.isArray(user.aerodromes) ? user.aerodromes : (Array.isArray(user.aerodromes_autorises) ? user.aerodromes_autorises : (user.aerodrome_id ? [user.aerodrome_id] : []));
+  
+  aeroArray.forEach(a => {
+    const aId = typeof a === 'object' && a !== null ? (a._id || a.id) : a;
+    const cb = document.querySelector(`#user-aero-checkboxes input[value="${aId}"]`);
+    if (cb) cb.checked = true;
+  });
+
+  document.querySelector('#tab-users .panel-left .panel-title').textContent = 'MODIFIER UTILISATEUR';
+  const submitBtn = document.querySelector('#tab-users .panel-left .btn-primary');
+  if (submitBtn) submitBtn.textContent = 'ENREGISTRER';
+}
+
 /**
- * Affiche le résumé avant de confirmer la création
+ * Affiche le résumé avant de confirmer la création/modification
  */
 function reviewUserCreation() {
   const email      = (document.getElementById('user-email')?.value   || '').trim();
-  const password   = email; // Le mot de passe par défaut est l'email
+  const password   = email; // Le mot de passe par défaut est l'email (pour la création)
   const roleSelect =  document.getElementById('user-role-select');
   const roleId     =  roleSelect?.value || '';
   const roleName   =  roleSelect?.options[roleSelect.selectedIndex]?.text || '';
@@ -242,46 +273,53 @@ function reviewUserCreation() {
   aeroHtml += '</ul></div>';
 
   const bodyHtml = `
-    <p>Veuillez vérifier les informations suivantes avant la création de l'utilisateur :</p>
+    <p>Veuillez vérifier les informations suivantes avant ${_editingUserId ? "la modification" : "la création"} de l'utilisateur :</p>
     <div style="margin-top:15px; font-size:14px;">
       <p><strong>Email :</strong> ${email}</p>
-      <p><strong>Mot de passe :</strong> <em>Identique à l'email (à changer à la première connexion)</em></p>
+      ${!_editingUserId ? `<p><strong>Mot de passe :</strong> <em>Identique à l'email (à changer à la première connexion)</em></p>` : ''}
       <p><strong>Rôle :</strong> ${roleName}</p>
       ${aeroHtml}
     </div>
   `;
 
-  showModal('Résumé de création', bodyHtml, () => {
-    confirmCreateUser(email, password, roleId, selectedAeros.map(a => a.id));
+  showModal(_editingUserId ? 'Résumé de modification' : 'Résumé de création', bodyHtml, () => {
+    confirmSubmitUser(email, password, roleId, selectedAeros.map(a => a.id));
   });
 }
 
-/** Crée l'utilisateur en envoyant les données au serveur */
-async function confirmCreateUser(email, password, roleId, aerodromeIds) {
+/** Soumet la création ou la modification de l'utilisateur au serveur */
+async function confirmSubmitUser(email, password, roleId, aerodromeIds) {
   const payload = {
     email,
-    password,
     role_id: roleId,
   };
   
-  // Envoyer le tableau des aérodromes associés
-  if (aerodromeIds.length > 0) {
-    payload.aerodromes = aerodromeIds;
+  if (!_editingUserId) {
+    payload.password = password;
   }
+  
+  // Envoyer le tableau des aérodromes associés
+  payload.aerodromes = aerodromeIds; // Envoie tableau vide si aucun coché
 
   try {
-    await apiFetch('/utilisateurs', 'POST', payload);
-    showToast(`Utilisateur « ${email} » créé avec succès`, 'success');
+    if (_editingUserId) {
+      await apiFetch(`/utilisateurs/${_editingUserId}`, 'PATCH', payload);
+      showToast(`Utilisateur « ${email} » modifié avec succès`, 'success');
+    } else {
+      await apiFetch('/utilisateurs', 'POST', payload);
+      showToast(`Utilisateur « ${email} » créé avec succès`, 'success');
+    }
     clearUserForm();
     await loadUsers();
   } catch (e) {
     showToast('Erreur : ' + e.message, 'error');
-    console.error('[confirmCreateUser]', e);
+    console.error('[confirmSubmitUser]', e);
   }
 }
 
-/** Réinitialise le formulaire de création d'utilisateur */
+/** Réinitialise le formulaire d'utilisateur */
 function clearUserForm() {
+  _editingUserId = null;
   ['user-email', 'user-password', 'user-aero-search'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
@@ -293,6 +331,11 @@ function clearUserForm() {
   const checkboxes = document.querySelectorAll('#user-aero-checkboxes input[type="checkbox"]');
   checkboxes.forEach(cb => cb.checked = false);
   filterUserAerodromes(); // Rétablir l'affichage de tous les items
+
+  const titleEl = document.querySelector('#tab-users .panel-left .panel-title');
+  if (titleEl) titleEl.textContent = 'NOUVEL UTILISATEUR';
+  const submitBtn = document.querySelector('#tab-users .panel-left .btn-primary');
+  if (submitBtn) submitBtn.textContent = "CRÉER L'UTILISATEUR";
 }
 
 /* ══════════════════════════════════════════════════════════

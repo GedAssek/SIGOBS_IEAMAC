@@ -37,10 +37,10 @@ function geoMapInit() {
     GeoMap.map = new maplibregl.Map({
       container: 'maplibre-container',
       style: SATELLITE_STYLE,
-      // Centre : Aéroport International de Lomé-Tokoin (DXXX) — position par défaut
-      center: [1.2546, 6.1656],
-      zoom: 13,
-      pitch: 45,
+      // Centre : Vue globale (le globe) en attendant le chargement de l'aérodrome
+      center: [0, 0],
+      zoom: 2,
+      pitch: 0,
       bearing: 0,
       antialias: true,
     });
