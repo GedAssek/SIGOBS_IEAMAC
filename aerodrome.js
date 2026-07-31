@@ -164,6 +164,12 @@ async function loadAerodromeById(id, raw) {
     showToast(`${schema.icao} chargé — ${pisteCount} piste(s) · ${qfuCount} QFU`, 'success');
 
     if (typeof renderAerodromeSwitcher === 'function') renderAerodromeSwitcher();
+
+    // Si l'onglet corbeille est actif, rechargez-le pour l'aérodrome courant
+    const corbeilleTab = document.getElementById('tab-corbeille');
+    if (corbeilleTab && corbeilleTab.classList.contains('active')) {
+      if (typeof loadCorbeille === 'function') loadCorbeille();
+    }
   } catch (err) {
     setAerodromeStatus('error', 'Erreur de chargement');
     setApiStatus('disconnected', 'API inaccessible');

@@ -901,6 +901,16 @@ function showObstacleConformityDetail(id) {
   const tabBtn = document.getElementById('tab-btn-analyse');
   if (tabBtn) switchTab(tabBtn, 'analyse');
 
+  // Centrer la carte sur l'obstacle
+  if (typeof GeoMap !== 'undefined' && GeoMap.map && obs.latitude != null && obs.longitude != null) {
+    GeoMap.map.flyTo({
+      center: [obs.longitude, obs.latitude],
+      zoom: 17,
+      pitch: 60,
+      duration: 1200
+    });
+  }
+
   const mainEl = document.getElementById('conf-main-status');
   const subEl = document.getElementById('conf-sub');
   const surfListEl = document.getElementById('conf-surfaces-list');

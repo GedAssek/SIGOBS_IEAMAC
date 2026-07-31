@@ -4339,3 +4339,370 @@ body {
     gap: 4px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   CORBEILLE — Styles premium
+   ═══════════════════════════════════════════════════════════ */
+
+/* Layout principal */
+.corbeille-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 20px 24px;
+  gap: 0;
+  overflow-y: auto;
+  background: var(--bg-base);
+}
+
+/* ── En-tête ───────────────────────────────────────────── */
+.corbeille-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 24px;
+  background: var(--bg-panel);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border: 1px solid var(--border-neutral);
+  border-bottom: none;
+  flex-shrink: 0;
+}
+
+.corbeille-header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.corbeille-title-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.corbeille-icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.10) 0%, rgba(239, 68, 68, 0.04) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  color: var(--red);
+  flex-shrink: 0;
+}
+
+.corbeille-title {
+  font-family: var(--font-head);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.corbeille-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  margin-top: 2px;
+}
+
+/* Badge aérodrome courant */
+.corbeille-aero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.10) 0%, rgba(14, 165, 233, 0.04) 100%);
+  border: 1px solid var(--cyan-border);
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--cyan-dim);
+  letter-spacing: 0.06em;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.15); }
+  50% { box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.06); }
+}
+
+.corbeille-aero-badge::before {
+  content: '✈';
+  font-size: 10px;
+}
+
+/* Section droite du header */
+.corbeille-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.corbeille-type-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.corbeille-type-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.corbeille-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--bg-input)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2364748B' stroke-width='1.5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E")
+    no-repeat right 10px center;
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius-sm);
+  padding: 7px 32px 7px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  font-family: var(--font-body);
+  min-width: 160px;
+}
+
+.corbeille-select:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-glow);
+}
+
+.corbeille-select:hover {
+  border-color: var(--border-bright);
+}
+
+/* Bouton actualiser */
+.btn-refresh-corbeille {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  font-family: var(--font-label);
+}
+
+.btn-refresh-corbeille:hover {
+  background: var(--cyan-glow);
+  border-color: var(--cyan);
+  color: var(--cyan-dim);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-refresh-corbeille:active {
+  transform: translateY(0);
+}
+
+/* ── Séparateur ──────────────────────────────────────── */
+.corbeille-divider {
+  height: 1px;
+  background: linear-gradient(90deg, var(--border-neutral) 0%, var(--border-light) 50%, var(--border-neutral) 100%);
+  flex-shrink: 0;
+}
+
+/* ── Zone tableau ────────────────────────────────────── */
+.corbeille-table-wrap {
+  flex: 1;
+  overflow-x: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-neutral);
+  border-top: none;
+  border-bottom: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.corbeille-table {
+  width: 100%;
+  min-width: 640px;
+}
+
+.corbeille-table thead th {
+  background: var(--bg-subtle);
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-neutral);
+}
+
+.corbeille-row {
+  transition: background 0.15s ease;
+}
+
+.corbeille-row:hover {
+  background: var(--bg-hover) !important;
+}
+
+.corbeille-row td {
+  padding: 11px 14px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border-light);
+  vertical-align: middle;
+}
+
+/* Colonne date */
+.date-cell {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+/* Colonne actions */
+.actions-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px !important;
+  white-space: nowrap;
+}
+
+/* Type badge */
+.type-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  background: rgba(14, 165, 233, 0.08);
+  border: 1px solid rgba(14, 165, 233, 0.15);
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cyan-dim);
+  letter-spacing: 0.03em;
+}
+
+/* ── Boutons d'action ────────────────────────────────── */
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: var(--radius-xs);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  border: 1px solid;
+  transition: all 0.18s ease;
+  font-family: var(--font-label);
+  white-space: nowrap;
+}
+
+.restore-btn {
+  background: rgba(16, 185, 129, 0.07);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: var(--green-dim);
+}
+
+.restore-btn:hover {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: var(--green);
+  color: var(--green-dim);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(16, 185, 129, 0.18);
+}
+
+.delete-btn {
+  background: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.25);
+  color: var(--red-dim);
+}
+
+.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: var(--red);
+  color: var(--red-dim);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(239, 68, 68, 0.18);
+}
+
+.action-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* ── Pagination corbeille ────────────────────────────── */
+.corbeille-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 14px 24px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-neutral);
+  border-top: 1px solid var(--border-light);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  flex-shrink: 0;
+}
+
+.pagination-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: var(--bg-subtle);
+  padding: 5px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--border-neutral);
+  letter-spacing: 0.04em;
+  font-family: var(--font-label);
+}
+
+/* ── État vide ───────────────────────────────────────── */
+.empty-corbeille {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ── Indicateur de chargement ────────────────────────── */
+.loading-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 30px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ── Cellule d'erreur ────────────────────────────────── */
+.error-cell {
+  color: var(--red);
+  padding: 20px !important;
+  font-size: 13px;
+  text-align: center;
+}

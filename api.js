@@ -314,4 +314,7 @@ function switchTab(btn, tab) {
   if (tab === 'archive') {
     if (typeof renderArchiveTab === 'function') renderArchiveTab();
   }
+  if (tab === 'corbeille') {
+    if (typeof loadCorbeille === 'function') loadCorbeille();
+  }
 }

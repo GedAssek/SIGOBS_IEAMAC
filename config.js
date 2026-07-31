@@ -1,5 +1,33 @@
 'use strict';
 /* ═══════════════════════════════════════════════════════════
+   SIGOBS — SÉCURITÉ : Neutralisation des logs navigateur
+   Empêche la divulgation d'informations sensibles dans les
+   outils de développement du navigateur.
+   → Pour activer les logs en dev : window.SIGOBS_DEBUG = true
+     avant le chargement de ce fichier.
+   ═══════════════════════════════════════════════════════════ */
+;(function _suppressConsoleLogs() {
+  /* Autoriser les logs si le mode debug est explicitement activé */
+  if (typeof window !== 'undefined' && window.SIGOBS_DEBUG === true) return;
+
+  const _noop = function() {};
+  const _methods = ['log', 'info', 'debug', 'dir', 'table', 'trace', 'group', 'groupCollapsed', 'groupEnd', 'time', 'timeEnd', 'count', 'assert'];
+  _methods.forEach(function(method) {
+    try { console[method] = _noop; } catch(e) { /* Lecture seule dans certains environnements */ }
+  });
+
+  /* Réduire console.warn à un simple no-op */
+  try { console.warn = _noop; } catch(e) {}
+
+  /* console.error : message générique sans détails techniques */
+  try {
+    console.error = function() {
+      /* Silencieux en production — les erreurs sont gérées par l'UI */
+    };
+  } catch(e) {}
+})();
+
+/* ═══════════════════════════════════════════════════════════
    SIGOBS — config.js
    Configuration globale, état partagé, constantes
    ═══════════════════════════════════════════════════════════ */

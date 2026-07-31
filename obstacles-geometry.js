@@ -13,11 +13,8 @@
      - horizontale intérieure : altadm = 45 + alt_ad (constante)
      - conique                : altadm = 45 + alt_ad + d × 0,05
        où d = distance horizontale au bord intérieur (surface horizontale)
-   En testant l'appartenance du point de l'obstacle à chaque polygone
-   (point-in-polygon, via Turf.js) et en prenant le MINIMUM des sommets
-   des polygones qui le contiennent, on obtient :
-     - l'altitude admissible à cet endroit (le plafond le plus bas
-       parmi toutes les surfaces qui couvrent la position),
+   En testant l'appartenance du point de l'obstacle à cet endroit (le plafond le plus bas
+   parmi toutes les surfaces qui couvrent la position),
      - le dégagement (marge) = altitude admissible − altitude obstacle,
      - la détection "hors surfaces" (aucun polygone ne contient le point).
 
@@ -220,6 +217,30 @@ function getClosestRunwayStripDist(lat, lon) {
 }
 
 /**
+ * Détermine si un point (lat, lon) est à "gauche" ou "droite" de l'axe de la piste.
+ * Retourne 'gauche', 'droite' ou null si indéterminable.
+ */
+function getObstacleSide(lat, lon) {
+  if (App.runways && App.runways.length >= 2) {
+    try {
+      const r = App.runways.find(x => x.thresholdLat != null && x.thresholdLon != null && x.reciprocal);
+      if (r) {
+        const opp = App.runways.find(op => op.designation === r.reciprocal);
+        if (opp && opp.thresholdLat != null) {
+          const dx = opp.thresholdLon - r.thresholdLon;
+          const dy = opp.thresholdLat - r.thresholdLat;
+          const ox = lon - r.thresholdLon;
+          const oy = lat - r.thresholdLat;
+          const cross = dx * oy - dy * ox;
+          return cross >= 0 ? 'gauche' : 'droite';
+        }
+      }
+    } catch (e) {}
+  }
+  return null;
+}
+
+/**
  * Calcule, pour une position donnée (lat/lon), l'altitude admissible
  * (en mètres AMSL) et la liste des surfaces OLS qui couvrent ce point.
  *
@@ -395,25 +416,9 @@ function computeAdmissibleAltitude(lat, lon, obs) {
       ) {
         // Déterminer le côté gauche/droite par rapport à l'axe de piste
         let transLabel = 'Transition';
-        if (App.runways && App.runways.length >= 2) {
-          try {
-            const r = App.runways.find(x => x.thresholdLat != null && x.thresholdLon != null && x.reciprocal);
-            if (r) {
-              const opp = App.runways.find(op => op.designation === r.reciprocal);
-              if (opp && opp.thresholdLat != null) {
-                // Calcul du produit vectoriel (cross product) pour détecter le côté
-                // Vecteur axe piste : (dx, dy), vecteur axe→obstacle : (ox, oy)
-                const dx = opp.thresholdLon - r.thresholdLon;
-                const dy = opp.thresholdLat - r.thresholdLat;
-                const ox = lon - r.thresholdLon;
-                const oy = lat - r.thresholdLat;
-                const cross = dx * oy - dy * ox;
-                // cross > 0 → gauche du vecteur piste ; cross < 0 → droite
-                transLabel = cross >= 0 ? 'Transition gauche' : 'Transition droite';
-              }
-            }
-          } catch (e) { /* Fallback au label générique */ }
-        }
+        const side = getObstacleSide(lat, lon);
+        if (side === 'gauche') transLabel = 'Transition gauche';
+        if (side === 'droite') transLabel = 'Transition droite';
 
         const d = Math.min(stripInfo.distM, LIMITE_SUP_M);
         const transitionSommetM = stripInfo.altBaseM + d * PENTE_TRANS;
@@ -429,6 +434,25 @@ function computeAdmissibleAltitude(lat, lon, obs) {
 
   if (!covering.length) {
     return { admissibleM: null, coveringSurfaces: [], horsSurfaces: true };
+  }
+
+  // Filtrer les surfaces de transition contradictoires (ex: Transition gauche AND droite en même temps)
+  // qui peuvent provenir d'un GeoJSON backend mal découpé ou couvrant toute la bande.
+  const side = getObstacleSide(lat, lon);
+  if (side) {
+    const hasGauche = covering.some(c => c.label && c.label.toLowerCase().includes('transition gauche'));
+    const hasDroite = covering.some(c => c.label && c.label.toLowerCase().includes('transition droite'));
+    if (hasGauche && hasDroite) {
+      // On retire la surface qui n'est pas du bon côté
+      for (let i = covering.length - 1; i >= 0; i--) {
+        const lbl = (covering[i].label || '').toLowerCase();
+        if (side === 'gauche' && lbl.includes('transition droite')) {
+          covering.splice(i, 1);
+        } else if (side === 'droite' && lbl.includes('transition gauche')) {
+          covering.splice(i, 1);
+        }
+      }
+    }
   }
 
   const admissibleM = Math.min(...covering.map(c => c.sommetM).filter(v => v != null));
